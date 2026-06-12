@@ -5,12 +5,18 @@ import { checkPosPermission } from '@/lib/pos/check-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { toCents } from '@/lib/utils/refund-math';
 
+// Session #149 (Item 3) — added payment_link_paid_at +
+// payment_link_amount_cents to the appointment embed so the POS
+// PaymentLinkAmountModal can render the inline "Previous link was paid
+// $X on Y" advisory BEFORE the operator picks a new amount. The server
+// 409 + 'previous_link_paid' confirmation is still the load-bearing
+// protection; this surfaces the same data one step earlier in the flow.
 const JOB_SELECT = `
   *,
   customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone, email),
   vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color, size_class),
   assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name),
-  appointment:appointments!jobs_appointment_id_fkey(id, status, payment_status, total_amount, channel, is_mobile, mobile_zone_id, mobile_address, mobile_surcharge, mobile_zone_name_snapshot, coupon_code, coupon_discount, loyalty_points_redeemed, loyalty_discount, manual_discount_value, manual_discount_label),
+  appointment:appointments!jobs_appointment_id_fkey(id, status, payment_status, total_amount, channel, is_mobile, mobile_zone_id, mobile_address, mobile_surcharge, mobile_zone_name_snapshot, coupon_code, coupon_discount, loyalty_points_redeemed, loyalty_discount, manual_discount_value, manual_discount_label, payment_link_paid_at, payment_link_amount_cents),
   addons:job_addons(*)
 `;
 
@@ -25,6 +31,12 @@ interface JobWithAppointment {
     total_amount: number;
     channel?: string;
     amount_due_cents?: number;
+    /** Item 3 (#149) — surfaced so client can render inline advisory. */
+    payment_link_paid_at?: string | null;
+    /** Item 3 (#149) — companion to payment_link_paid_at; the link
+     *  amount the prior link cycle was sent for. NULL when the operator
+     *  chose full-remaining at that send time. */
+    payment_link_amount_cents?: number | null;
   } | null;
   [key: string]: unknown;
 }

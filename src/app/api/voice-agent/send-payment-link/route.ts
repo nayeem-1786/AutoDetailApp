@@ -39,6 +39,7 @@ import {
   type PaymentLinkMethod,
 } from '@/lib/payment-link/send';
 import { STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
+import { getRequestIp } from '@/lib/services/audit';
 
 type Channel = 'sms' | 'email';
 const VALID_CHANNELS: readonly Channel[] = ['sms', 'email'] as const;
@@ -68,10 +69,12 @@ export async function POST(request: NextRequest) {
       appointment_id,
       amount_cents: rawAmountCents,
       channels: rawChannels,
+      confirm_resend: rawConfirmResend,
     } = body as {
       appointment_id?: string;
       amount_cents?: unknown;
       channels?: unknown;
+      confirm_resend?: unknown;
     };
 
     if (typeof appointment_id !== 'string' || !appointment_id.trim()) {
@@ -138,6 +141,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Item 3 (Session #149) — re-send-after-paid confirmation bypass.
+    // The voice agent receives a 409 + `code: 'previous_link_paid'` with
+    // `instructions_for_agent` (added below) when the prior link was paid;
+    // the agent's tool definition guides it to confirm conversationally
+    // with the customer before retrying with `confirm_resend: true`. The
+    // dispatcher does NOT auto-retry; explicit operator/customer intent
+    // is required.
+    const confirmResend = rawConfirmResend === true;
+
     const admin = createAdminClient();
 
     const result = await sendPaymentLink({
@@ -145,12 +157,50 @@ export async function POST(request: NextRequest) {
       appointmentId: appointment_id,
       method,
       amountCents,
+      confirmResend,
+      // Item 5 (Session #149) — actor context for the audit_log row.
+      // Voice-agent path has NO per-user identity (`validateApiKey` returns
+      // {valid, error} only; Bearer-key is a shared fleet credential).
+      // triggeredBy: 'voice_agent' resolves to source: 'api' inside the
+      // helper, matching specialty-callback + Stripe webhook precedents.
+      // ipAddress captured for forensic correlation (ElevenLabs egress IP).
+      actor: {
+        triggeredBy: 'voice_agent',
+        userId: null,
+        userEmail: null,
+        employeeName: null,
+        ipAddress: getRequestIp(request),
+      },
     });
 
     if (!result.success) {
       const errorBody: Record<string, unknown> = { error: result.error };
       if (result.channels) errorBody.channels = result.channels;
       if (result.errors) errorBody.errors = result.errors;
+      // Item 3 — bubble the structured 'previous_link_paid' surface to the
+      // LLM through the dispatcher's existing `instructions_for_agent`
+      // passthrough at `voiceAgentFetch:262-271`. When the body parses to
+      // JSON with `instructions_for_agent: string`, the dispatcher returns
+      // the full JSON to the agent so it can react conversationally
+      // without leaking system details.
+      if (result.code === 'previous_link_paid' && result.previous_payment) {
+        errorBody.code = result.code;
+        errorBody.previous_payment = result.previous_payment;
+        const priorAmount = result.previous_payment.amount_cents;
+        const priorAmountStr =
+          typeof priorAmount === 'number'
+            ? `$${(priorAmount / 100).toFixed(2)}`
+            : 'an unknown amount';
+        const priorDate = new Date(result.previous_payment.paid_at).toLocaleString(
+          'en-US',
+          { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Los_Angeles' }
+        );
+        errorBody.instructions_for_agent =
+          `The previous payment link for this appointment was already paid ${priorAmountStr} on ${priorDate}. ` +
+          `Confirm with the customer that they want to receive a NEW payment link before retrying. ` +
+          `If they confirm, call this tool again with confirm_resend: true. ` +
+          `If they did not intend a new link, do NOT retry — apologize and resolve the confusion.`;
+      }
       return NextResponse.json(errorBody, { status: result.status });
     }
 

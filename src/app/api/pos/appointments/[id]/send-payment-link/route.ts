@@ -16,6 +16,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendPaymentLink } from '@/lib/payment-link/send';
 import { STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
+import { getRequestIp } from '@/lib/services/audit';
 
 type Method = 'email' | 'sms' | 'both';
 
@@ -62,6 +63,13 @@ export async function POST(
       amountCents = rawAmountCents;
     }
 
+    // Item 3 (Session #149) — re-send-after-paid confirmation bypass. The
+    // operator UI parses the 409 + `code: 'previous_link_paid'` response
+    // and re-POSTs with `confirm_resend: true` after the operator clicks
+    // "Send anyway" in the confirmation modal. Always boolean-coerce so a
+    // truthy-string body value isn't accepted as bypass.
+    const confirmResend = body?.confirm_resend === true;
+
     const admin = createAdminClient();
 
     const result = await sendPaymentLink({
@@ -69,12 +77,29 @@ export async function POST(
       appointmentId: id,
       method,
       amountCents,
+      confirmResend,
+      // Item 5 (Session #149) — actor context for the audit_log row.
+      // POS path has a fully-identified operator session via
+      // authenticatePosRequest. triggeredBy: 'operator' resolves to
+      // source: 'pos' inside the helper.
+      actor: {
+        triggeredBy: 'operator',
+        userId: posEmployee.auth_user_id,
+        userEmail: posEmployee.email,
+        employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`.trim(),
+        ipAddress: getRequestIp(request),
+      },
     });
 
     if (!result.success) {
       const errorBody: Record<string, unknown> = { error: result.error };
       if (result.channels) errorBody.channels = result.channels;
       if (result.errors) errorBody.errors = result.errors;
+      // Item 3 — bubble the structured 'previous_link_paid' surface to the
+      // client verbatim so the dialog can render the confirmation modal
+      // with the previous payment context.
+      if (result.code) errorBody.code = result.code;
+      if (result.previous_payment) errorBody.previous_payment = result.previous_payment;
       return NextResponse.json(errorBody, { status: result.status });
     }
 

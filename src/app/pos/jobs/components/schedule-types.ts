@@ -97,5 +97,18 @@ export interface PosUnstartedAppointment {
   appointment_services: PosScheduleEntry['appointment_services'];
   total_amount: number;
   deposit_amount: number | null;
+  /**
+   * Session #149 (Item 3) — payment_link lifecycle fields surfaced so the
+   * strip card's `<PaymentLinkAmountModal>` mount can render the inline
+   * "Previous link was paid $X on Y" advisory. `payment_link_paid_at` is
+   * non-null when the prior payment-link cycle was consumed by a customer
+   * payment; `payment_link_amount_cents` is the prior link's chosen amount
+   * (may be null when the operator chose "full remaining" at that send
+   * time — advisory drops the dollar portion in that case). Server-side
+   * 409 confirmation in `sendPaymentLink` is the load-bearing protection;
+   * these props power the transparency layer ahead of the click.
+   */
+  payment_link_paid_at: string | null;
+  payment_link_amount_cents: number | null;
   scope: 'today_unstarted';
 }

@@ -150,6 +150,14 @@ interface JobDetailData {
     loyalty_discount?: number | null;
     manual_discount_value?: number | null;
     manual_discount_label?: string | null;
+    /** Session #149 (Item 3) — surfaced for PaymentLinkAmountModal inline
+     *  advisory. Non-null when the prior payment-link cycle was consumed
+     *  by a customer payment. */
+    payment_link_paid_at?: string | null;
+    /** Session #149 (Item 3) — companion to payment_link_paid_at; the
+     *  prior link's chosen amount (null when operator chose full-remaining
+     *  at that send). Advisory drops the dollar portion when null. */
+    payment_link_amount_cents?: number | null;
   } | null;
   addons: AddonData[] | null;
 }
@@ -1849,6 +1857,10 @@ export function JobDetail({
                 ? `${job.customer.first_name} ${job.customer.last_name}`.trim()
                 : undefined
             }
+            // Session #149 (Item 3) — inline advisory data; modal suppresses
+            // the notice when previousLinkPaidAt is null/undefined.
+            previousLinkPaidAt={appt?.payment_link_paid_at ?? null}
+            previousLinkAmountCents={appt?.payment_link_amount_cents ?? null}
             onContinue={(amountCents) => {
               // Modal closes itself via onOpenChange(false) inside handleContinue
               // (Session 5-followup Bug 1 fix). We just record the choice and

@@ -24,6 +24,28 @@ interface PaymentLinkAmountModalProps {
   /** Fired with the chosen amount in integer cents when staff clicks Continue. */
   onContinue: (amountCents: number) => void;
   customerName?: string;
+  /**
+   * Item 3 (Session #149) — inline advisory data. When the appointment's
+   * previous payment-link cycle was consumed by a customer payment,
+   * `appointments.payment_link_paid_at` is set (a timestamp string). The
+   * caller passes that value through verbatim; this modal renders a
+   * small advisory above the preset row so the operator sees "Previous
+   * link was paid $X on Y" BEFORE picking a new amount.
+   *
+   * Pass `null` when no prior payment is on file (the common case — the
+   * advisory is suppressed). When non-null, the canonical paired field
+   * `previousLinkAmountCents` is read for the dollar value; when that
+   * companion is also null (operator chose full-remaining for the prior
+   * send, schema-level null), the advisory drops the dollar portion and
+   * shows "Previous link was paid on Y" without the amount.
+   *
+   * Server-side 409 confirmation is the load-bearing protection — the
+   * inline advisory is the transparency layer (`SendPaymentLinkDialog`
+   * still surfaces the confirm modal on 409 even if this prop is null).
+   */
+  previousLinkPaidAt?: string | null;
+  /** See `previousLinkPaidAt` jsdoc. Optional companion in cents. */
+  previousLinkAmountCents?: number | null;
 }
 
 function pctOf(cents: number, pct: number): number {
@@ -37,6 +59,8 @@ export function PaymentLinkAmountModal({
   remainingCents,
   onContinue,
   customerName,
+  previousLinkPaidAt,
+  previousLinkAmountCents,
 }: PaymentLinkAmountModalProps) {
   const [selected, setSelected] = useState<Preset | null>(null);
   // Custom amount lives as integer cents and entry is "fixed-decimal" (Square /
@@ -117,6 +141,41 @@ export function PaymentLinkAmountModal({
             ? `Choose how much to charge ${customerName}.`
             : 'Choose how much to charge the customer.'}
         </p>
+
+        {/* Item 3 (#149) inline advisory — operator sees the prior link's
+            paid amount + date BEFORE picking a new amount. The server still
+            enforces the 409 confirmation (`SendPaymentLinkDialog` parses
+            `code: 'previous_link_paid'`) as the load-bearing protection;
+            this advisory converts a surprising click-time prompt into a
+            known, informed confirmation. Amber color signals "heads up"
+            without being a destructive-action red. */}
+        {previousLinkPaidAt ? (
+          <div
+            className="rounded-md border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-200"
+            role="status"
+          >
+            <span className="font-medium">Previous link was paid</span>
+            {typeof previousLinkAmountCents === 'number' ? (
+              <>
+                {' '}
+                <span className="tabular-nums font-semibold">
+                  ${(previousLinkAmountCents / 100).toFixed(2)}
+                </span>
+              </>
+            ) : null}{' '}
+            on{' '}
+            <span className="tabular-nums">
+              {new Date(previousLinkPaidAt).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              })}
+            </span>
+            .
+          </div>
+        ) : null}
 
         {/* Preset row */}
         <div className="grid grid-cols-2 gap-2">

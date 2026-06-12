@@ -187,6 +187,11 @@ export async function GET(request: NextRequest) {
       // balance" error — misleading-button class. Matches the existing
       // `appointments.payment_status` enum (pending|partial|paid|refunded|
       // partial_refund) from `20260201000001_create_enums.sql`.
+      // Session #149 (Item 3) — payment_link_paid_at + payment_link_amount_cents
+      // added so the strip's PaymentLinkAmountModal mount can render the
+      // inline "Previous link was paid $X on Y" advisory. Same shape as
+      // jobs/[id] JOB_SELECT extension (mirrors so both POS modal mount
+      // points have the same data).
       let unstartedQuery = supabase
         .from('appointments')
         .select(`
@@ -199,6 +204,8 @@ export async function GET(request: NextRequest) {
           payment_status,
           total_amount,
           deposit_amount,
+          payment_link_paid_at,
+          payment_link_amount_cents,
           customer:customers!customer_id(id, first_name, last_name, phone, email),
           vehicle:vehicles!vehicle_id(id, year, make, model, color),
           detailer:employees!employee_id(id, first_name, last_name),
@@ -257,6 +264,13 @@ export async function GET(request: NextRequest) {
             })),
             total_amount: Number(a.total_amount ?? 0),
             deposit_amount: a.deposit_amount == null ? null : Number(a.deposit_amount),
+            // Session #149 (Item 3) — pass-through to the strip card's
+            // PaymentLinkAmountModal advisory.
+            payment_link_paid_at: a.payment_link_paid_at ?? null,
+            payment_link_amount_cents:
+              a.payment_link_amount_cents == null
+                ? null
+                : Number(a.payment_link_amount_cents),
             scope: 'today_unstarted' as const,
           }));
       }
@@ -286,6 +300,12 @@ interface UnstartedRawRow {
   status: PosUnstartedAppointment['status'];
   channel: PosUnstartedAppointment['channel'];
   payment_status: PosUnstartedAppointment['payment_status'];
+  /** Item 3 (#149) — surfaced for PaymentLinkAmountModal inline advisory. */
+  payment_link_paid_at: string | null;
+  /** Item 3 (#149) — Supabase may return numeric or string for cents-typed
+   *  columns depending on JSON serialization; coerce to number at the mapping
+   *  site (see :260-264). */
+  payment_link_amount_cents: number | string | null;
   total_amount: number | string | null;
   deposit_amount: number | string | null;
   customer: PosUnstartedAppointment['customer'];

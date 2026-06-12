@@ -1668,6 +1668,10 @@ export function JobQueue({
                 ? `${stripPaymentLinkTarget.customer.first_name} ${stripPaymentLinkTarget.customer.last_name}`.trim()
                 : undefined
             }
+            // Session #149 (Item 3) — inline advisory pass-through for the
+            // strip card mount; same source as job-detail's mount above.
+            previousLinkPaidAt={stripPaymentLinkTarget.payment_link_paid_at ?? null}
+            previousLinkAmountCents={stripPaymentLinkTarget.payment_link_amount_cents ?? null}
             onContinue={(amountCents) => {
               setStripSelectedAmountCents(amountCents);
               setStripLinkDialogOpen(true);

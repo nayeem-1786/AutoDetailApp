@@ -31,6 +31,9 @@ interface MockAppointment {
   scheduled_date: string;
   scheduled_start_time: string;
   payment_link_token: string | null;
+  // Session #149 (Item 3) — re-send guard reads these from the appt SELECT.
+  payment_link_paid_at: string | null;
+  payment_link_amount_cents: number | null;
   customer: {
     id: string;
     first_name: string | null;
@@ -94,6 +97,15 @@ vi.mock('@/lib/sms/render-sms-template', () => ({
 // Business info mock
 vi.mock('@/lib/data/business', () => ({
   getBusinessInfo: async () => ({ name: 'Smart Details', phone: '+14245551234' }),
+}));
+
+// Session #149 (Item 5) — audit_log write mock. The helper calls
+// `logAudit()` on every successful send; the dispatcher contract test
+// (Item-5 — "audit row written on success") asserts on this mock.
+const logAuditMock = vi.fn();
+vi.mock('@/lib/services/audit', () => ({
+  logAudit: (...args: unknown[]) => logAuditMock(...args),
+  getRequestIp: () => null,
 }));
 
 // -----------------------------------------------------------------------------
@@ -232,15 +244,27 @@ function buildTransactionsQuery() {
 }
 
 function buildPaymentsQuery() {
+  // Session #149 (Item 3) — the helper now chains `.in(...).order(...)` so
+  // it can read the most-recent payment row for the `previous_payment.
+  // amount_cents` value in the 409 'previous_link_paid' response. The mock
+  // returns `state.payments` verbatim; tests are responsible for setting
+  // the array in DESC-by-created_at order to mirror the helper's expectation.
   const node = {
     select(_: string) {
       return this;
     },
-    async in(_col: string, _values: string[]) {
-      if (state.forceErrors.paysLookup) {
-        return { data: null, error: { message: state.forceErrors.paysLookup } };
-      }
-      return { data: state.payments, error: null };
+    in(_col: string, _values: string[]) {
+      return {
+        async order(_orderCol: string, _opts: { ascending: boolean }) {
+          if (state.forceErrors.paysLookup) {
+            return {
+              data: null,
+              error: { message: state.forceErrors.paysLookup },
+            };
+          }
+          return { data: state.payments, error: null };
+        },
+      };
     },
   };
   return node;
@@ -259,6 +283,10 @@ function resetState() {
     scheduled_date: '2026-06-10',
     scheduled_start_time: '10:00:00',
     payment_link_token: 'EXISTING_TOKEN_xyz',
+    // Session #149 (Item 3) defaults — no prior link cycle consumed; the
+    // re-send guard is OFF for the happy-path tests.
+    payment_link_paid_at: null,
+    payment_link_amount_cents: null,
     customer: {
       id: 'cust-1',
       first_name: 'Jane',
@@ -284,6 +312,7 @@ function resetState() {
   sendTemplatedEmailMock.mockReset();
   sendSmsMock.mockReset();
   renderSmsTemplateMock.mockReset();
+  logAuditMock.mockReset();
   // Default happy-path returns
   sendTemplatedEmailMock.mockResolvedValue({
     usedTemplate: true,
@@ -299,6 +328,37 @@ function resetState() {
   });
 }
 
+/**
+ * Session #149 (Items 3 + 5) — default actor for tests that don't care
+ * about identity-passthrough. Operator path with a synthetic identity.
+ * Tests that DO care about actor (e.g. the voice-agent source threading
+ * test) pass an explicit actor override on the call site.
+ */
+const defaultActor = {
+  triggeredBy: 'operator' as const,
+  userId: 'test-user-id',
+  userEmail: 'test@example.com',
+  employeeName: 'Test Operator',
+  ipAddress: null,
+};
+
+/**
+ * Test-only wrapper around `sendPaymentLink` that auto-fills the new
+ * required `actor` field (Session #149 Item 5). Pre-#149 tests called the
+ * helper without an actor; making it required at the type level is the
+ * locked design, so the wrapper supplies a synthetic default and lets
+ * tests override per-call when they're exercising the actor pathway.
+ */
+async function send(
+  input: Record<string, unknown>
+): Promise<Awaited<ReturnType<typeof import('@/lib/payment-link/send').sendPaymentLink>>> {
+  const { sendPaymentLink } = await import('@/lib/payment-link/send');
+  return sendPaymentLink({
+    actor: defaultActor,
+    ...input,
+  } as Parameters<typeof sendPaymentLink>[0]);
+}
+
 // Pull in env vars the helper reads at runtime.
 process.env.NEXT_PUBLIC_APP_URL = 'https://smartdetails.test';
 
@@ -312,9 +372,8 @@ beforeEach(() => {
 
 describe('sendPaymentLink — validation chain (return-before-mutation)', () => {
   it('returns 422 when amount_cents is provided as a non-integer', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
     const admin = buildMockAdmin();
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: admin as unknown as never,
       appointmentId: 'appt-1',
       method: 'both',
@@ -328,8 +387,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
   });
 
   it('returns 422 when amount_cents is below the Stripe minimum (50 cents)', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -341,8 +399,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
 
   it('returns 404 when the appointment does not exist', async () => {
     state.appointment = null;
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -356,8 +413,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
 
   it('returns 500 when the appointment lookup throws', async () => {
     state.forceErrors.apptLookup = 'DB down';
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -370,8 +426,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
     'returns 409 when appointment status is %s',
     async (status) => {
       state.appointment!.status = status;
-      const { sendPaymentLink } = await import('@/lib/payment-link/send');
-      const result = await sendPaymentLink({
+      const result = await send({
         admin: buildMockAdmin() as unknown as never,
         appointmentId: 'appt-1',
         method: 'sms',
@@ -386,8 +441,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
 
   it('returns 409 when appointment is already paid', async () => {
     state.appointment!.payment_status = 'paid';
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -401,8 +455,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
 
   it('returns 422 when appointment has no customer', async () => {
     state.appointment!.customer = null;
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -416,8 +469,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
 
   it('returns 422 when method=email but customer has no email', async () => {
     state.appointment!.customer!.email = null;
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'email',
@@ -431,8 +483,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
 
   it('returns 422 when method=sms but customer has no phone', async () => {
     state.appointment!.customer!.phone = null;
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -448,8 +499,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
     state.appointment!.total_amount = 100.0;
     state.transactions = [{ id: 'tx-1' }];
     state.payments = [{ amount: 100.0 }]; // fully paid already
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -466,8 +516,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
     state.appointment!.total_amount = 100.0;
     state.transactions = [{ id: 'tx-1' }];
     state.payments = [{ amount: 25.0 }];
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -483,8 +532,7 @@ describe('sendPaymentLink — validation chain (return-before-mutation)', () => 
 
 describe('sendPaymentLink — success paths', () => {
   it('sends via SMS only when method=sms and reports channels.sms=sent', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -503,8 +551,7 @@ describe('sendPaymentLink — success paths', () => {
   });
 
   it('sends via email only when method=email and reports channels.email=sent', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'email',
@@ -519,8 +566,7 @@ describe('sendPaymentLink — success paths', () => {
   });
 
   it('sends via BOTH when method=both and reports both sent', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'both',
@@ -536,8 +582,7 @@ describe('sendPaymentLink — success paths', () => {
     state.appointment!.total_amount = 200.0;
     state.transactions = [];
     state.payments = [];
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -554,8 +599,7 @@ describe('sendPaymentLink — success paths', () => {
 
   it('uses the chosen amount when amountCents is provided', async () => {
     state.appointment!.total_amount = 200.0;
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -570,8 +614,7 @@ describe('sendPaymentLink — success paths', () => {
   });
 
   it('persists payment_link_amount_cents=NULL on success when caller omits amountCents (legacy full-balance semantic)', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    await sendPaymentLink({
+    await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -586,8 +629,7 @@ describe('sendPaymentLink — success paths', () => {
   });
 
   it('persists payment_link_amount_cents=<value> on success when caller provides amountCents', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    await sendPaymentLink({
+    await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -602,8 +644,7 @@ describe('sendPaymentLink — success paths', () => {
 
   it('reuses existing payment_link_token when one is already set on the appointment', async () => {
     state.appointment!.payment_link_token = 'PRE_MINTED_TOKEN_abc';
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -623,14 +664,13 @@ describe('sendPaymentLink — success paths', () => {
   it('mints a new token via crypto.getRandomValues when none exists, then writes it with .is(payment_link_token, null) guard', async () => {
     state.appointment!.payment_link_token = null;
     state.parallelTokenWinner = null;
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
     // The mock's .is(payment_link_token, null) UPDATE doesn't actually
     // persist (no parallelTokenWinner OR error), then the re-read
     // returns `state.appointment.payment_link_token` which is still null.
     // To pass through cleanly, set up the appointment's token via the
     // parallelTokenWinner facility so the re-read sees the value.
     state.parallelTokenWinner = 'MINTED_xx';
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -645,8 +685,7 @@ describe('sendPaymentLink — success paths', () => {
 describe('sendPaymentLink — partial failures', () => {
   it('reports email=failed + sms=sent + partial_errors when email send throws', async () => {
     sendTemplatedEmailMock.mockRejectedValueOnce(new Error('Mailgun down'));
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'both',
@@ -665,8 +704,7 @@ describe('sendPaymentLink — partial failures', () => {
       isActive: false,
       body: '',
     });
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'both',
@@ -685,8 +723,7 @@ describe('sendPaymentLink — partial failures', () => {
       error: 'rejected',
     });
     sendSmsMock.mockResolvedValueOnce({ success: false, error: 'twilio down' });
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    const result = await sendPaymentLink({
+    const result = await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'both',
@@ -704,8 +741,7 @@ describe('sendPaymentLink — partial failures', () => {
 
 describe('sendPaymentLink — SMS body composition', () => {
   it('passes the canonical chip set { first_name, amount_due, pay_url } to renderSmsTemplate', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    await sendPaymentLink({
+    await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -726,8 +762,7 @@ describe('sendPaymentLink — SMS body composition', () => {
   });
 
   it('tags the SMS send with notificationType=payment_link_sent and contextId=<appointment id>', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    await sendPaymentLink({
+    await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -759,8 +794,7 @@ describe('sendPaymentLink — SMS body composition', () => {
   // This test pins `logToConversation: true` on the contract so a future
   // refactor that drops the flag fails here loudly.
   it('passes logToConversation:true so the SMS appears in Admin > Messaging history (#146)', async () => {
-    const { sendPaymentLink } = await import('@/lib/payment-link/send');
-    await sendPaymentLink({
+    await send({
       admin: buildMockAdmin() as unknown as never,
       appointmentId: 'appt-1',
       method: 'sms',
@@ -770,5 +804,246 @@ describe('sendPaymentLink — SMS body composition', () => {
       expect.any(String),
       expect.objectContaining({ logToConversation: true }),
     );
+  });
+});
+
+// =============================================================================
+// Session #149 (Items 3 + 5) — re-send-after-paid guard + audit_log row
+// =============================================================================
+//
+// Class (a) items 3 + 5 land as a combined commit per the locked design:
+//   - Item 3: a structured 409 'previous_link_paid' code returned when the
+//     prior payment-link cycle was consumed (payment_link_paid_at IS NOT
+//     NULL) AND the caller did not pass confirmResend: true. The locked
+//     decision rejected the hard-block shape (Shape A) because multi-link
+//     deposit-then-balance flows are designed behavior; the confirmation
+//     surface (Shape B) is the protection layer for the operator-error
+//     "forgot the prior link was already paid" case.
+//   - Item 5: an audit_log row written via logAudit() on every successful
+//     send. Locked decisions: action='update' + details.event=
+//     'payment_link_sent' (mirrors stripe webhook payment_link confirm),
+//     entity_type='booking' (matches cancel-orchestration), source via
+//     actorSourceFor (operator→pos, voice_agent→api), and the row OMITS
+//     payment_link_token / customer phone / customer email (PII +
+//     bearer-credential lockout).
+//
+// Each test is paired with a "reverse-validation" assertion the comment
+// header names — these are the live mechanism that confirms each test
+// fails when the implementation regresses. The locked discipline from
+// Sessions #146-#148 carries forward here.
+
+describe('sendPaymentLink — Item 3: re-send-after-paid guard', () => {
+  // Reverse-validate: removing the guard at send.ts (or changing
+  // `!input.confirmResend` to a truthy-coerced expression) causes the
+  // helper to proceed past the guard and return success — this assertion
+  // then fails at `expect(result.status).toBe(409)`.
+  it('returns 409 + code=previous_link_paid when payment_link_paid_at IS NOT NULL and confirmResend is NOT passed', async () => {
+    state.appointment!.payment_link_paid_at = '2026-06-10T18:30:00.000Z';
+    state.appointment!.payment_link_amount_cents = 5000; // $50 deposit
+    state.appointment!.payment_status = 'partial';
+    state.transactions = [{ id: 'tx-1' }];
+    state.payments = [{ amount: 50.0 }];
+    const result = await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'sms',
+      // confirmResend NOT passed — guard must fire
+    });
+    expect(result.success).toBe(false);
+    if (result.success === false) {
+      expect(result.status).toBe(409);
+      expect(result.code).toBe('previous_link_paid');
+      expect(result.previous_payment).toBeDefined();
+      expect(result.previous_payment!.paid_at).toBe('2026-06-10T18:30:00.000Z');
+      expect(result.previous_payment!.amount_cents).toBe(5000);
+      // Critical: the post-send stamp must NOT have run (paid_at preserved).
+      const stamp = captured.updates.find(
+        (u) => u.payload.payment_link_sent_at !== undefined,
+      );
+      expect(stamp).toBeUndefined();
+    }
+  });
+
+  // Reverse-validate: gating the `confirmResend === true` bypass (e.g.
+  // changing the condition to `if (appt.payment_link_paid_at)` without
+  // checking confirmResend) keeps the 409 firing even on retry — this
+  // assertion then fails at `expect(result.success).toBe(true)`.
+  it('proceeds normally when payment_link_paid_at IS NOT NULL and confirmResend: true is passed', async () => {
+    state.appointment!.payment_link_paid_at = '2026-06-10T18:30:00.000Z';
+    state.appointment!.payment_link_amount_cents = 5000;
+    state.appointment!.payment_status = 'partial';
+    state.transactions = [{ id: 'tx-1' }];
+    state.payments = [{ amount: 50.0 }];
+    const result = await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'sms',
+      confirmResend: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.channels.sms).toBe('sent');
+    }
+    // Critical: the post-send stamp DID run (paid_at wiped, sent_at set).
+    const stamp = captured.updates.find(
+      (u) => u.payload.payment_link_sent_at !== undefined,
+    );
+    expect(stamp).toBeDefined();
+    expect(stamp!.payload.payment_link_paid_at).toBeNull();
+  });
+
+  // Reverse-validate: surfaces the actual bug class — partial-paid +
+  // previous link consumed. Removing the guard means the helper would
+  // return 200 + wipe paid_at, which is the silent-wipe bug. This test
+  // pins the partial-paid behavior specifically (the line-175
+  // status='paid' guard does NOT cover this state — the test asserts the
+  // 409 fires on 'partial', not 'paid').
+  it('returns 409 when payment_status=partial AND payment_link_paid_at IS NOT NULL (the real Item 3 bug surface)', async () => {
+    state.appointment!.payment_status = 'partial';
+    state.appointment!.payment_link_paid_at = '2026-06-10T18:30:00.000Z';
+    state.appointment!.payment_link_amount_cents = 5000;
+    state.transactions = [{ id: 'tx-1' }];
+    state.payments = [{ amount: 50.0 }];
+    const result = await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'sms',
+    });
+    expect(result.success).toBe(false);
+    if (result.success === false) {
+      expect(result.status).toBe(409);
+      expect(result.code).toBe('previous_link_paid');
+    }
+    // SMS must NOT have been sent (the guard runs pre-dispatch).
+    expect(sendSmsMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('sendPaymentLink — Item 5: audit_log row on successful send', () => {
+  // Reverse-validate: removing the `await logAudit(...)` call in send.ts
+  // causes `logAuditMock` to never be invoked — this assertion fails at
+  // `expect(logAuditMock).toHaveBeenCalledOnce()`.
+  it('writes an audit_log row with the canonical shape on success', async () => {
+    state.appointment!.total_amount = 200.0;
+    const result = await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'both',
+    });
+    expect(result.success).toBe(true);
+    expect(logAuditMock).toHaveBeenCalledOnce();
+    const auditCall = logAuditMock.mock.calls[0][0] as {
+      action: string;
+      entityType: string;
+      entityId: string;
+      source: string;
+      details: Record<string, unknown>;
+      userEmail: string | null;
+    };
+    expect(auditCall.action).toBe('update');
+    expect(auditCall.entityType).toBe('booking');
+    expect(auditCall.entityId).toBe('appt-1');
+    expect(auditCall.source).toBe('pos');
+    expect(auditCall.details.event).toBe('payment_link_sent');
+    expect(auditCall.details.method).toBe('both');
+    expect(auditCall.details.trigger).toBe('operator_send');
+    expect(auditCall.details.amount_cents).toBe(20000); // $200 full remaining
+    expect(auditCall.details.customer_id).toBe('cust-1');
+    expect(auditCall.details.scheduled_date).toBe('2026-06-10');
+    expect(auditCall.details.token_reused).toBe(true); // EXISTING_TOKEN_xyz reused
+    expect(auditCall.userEmail).toBe('test@example.com');
+  });
+
+  // Reverse-validate: moving the `await logAudit(...)` call ABOVE the
+  // re-send guard (so it fires before the 409 path) causes
+  // `logAuditMock` to be invoked even on the guarded 409 — this
+  // assertion fails at `expect(logAuditMock).not.toHaveBeenCalled()`.
+  it('does NOT write an audit_log row when the re-send guard fires', async () => {
+    state.appointment!.payment_link_paid_at = '2026-06-10T18:30:00.000Z';
+    state.appointment!.payment_status = 'partial';
+    state.transactions = [{ id: 'tx-1' }];
+    state.payments = [{ amount: 50.0 }];
+    const result = await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'sms',
+    });
+    expect(result.success).toBe(false);
+    expect(logAuditMock).not.toHaveBeenCalled();
+  });
+
+  // Reverse-validate: adding `payment_link_token`, `customer.phone`, or
+  // `customer.email` to the audit details JSONB would make these
+  // assertions fail. This pins the PII/credential omission contract from
+  // the Session #149 locked design (Option A).
+  it('audit details OMIT payment_link_token, customer phone, and customer email (PII + bearer-credential)', async () => {
+    await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'both',
+    });
+    expect(logAuditMock).toHaveBeenCalledOnce();
+    const auditCall = logAuditMock.mock.calls[0][0] as {
+      details: Record<string, unknown>;
+      entityLabel: string;
+    };
+    // Serialize the whole audit payload and scan for forbidden tokens/fields.
+    const serialized = JSON.stringify(auditCall);
+    expect(serialized).not.toContain('EXISTING_TOKEN_xyz');
+    expect(serialized).not.toContain('+14245551234');
+    expect(serialized).not.toContain('jane@example.com');
+    // Negative: details DO contain customer_id (the canonical reference).
+    expect(auditCall.details.customer_id).toBe('cust-1');
+  });
+
+  // Reverse-validate: removing the actorSourceFor switch (or hardcoding
+  // `source: 'pos'` regardless of triggeredBy) causes the voice-agent
+  // call to log source='pos' — this assertion fails at
+  // `expect(auditCall.source).toBe('api')`.
+  it('voice-agent actor maps to source=api (operator actor maps to source=pos)', async () => {
+    // Voice-agent path: no identity, source must be 'api'.
+    const voiceAgentActor = {
+      triggeredBy: 'voice_agent' as const,
+      userId: null,
+      userEmail: null,
+      employeeName: null,
+      ipAddress: null,
+    };
+    await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'sms',
+      actor: voiceAgentActor,
+    });
+    expect(logAuditMock).toHaveBeenCalledOnce();
+    const auditCall = logAuditMock.mock.calls[0][0] as {
+      source: string;
+      userId: string | null;
+      userEmail: string | null;
+      employeeName: string | null;
+      details: Record<string, unknown>;
+    };
+    expect(auditCall.source).toBe('api');
+    expect(auditCall.userId).toBeNull();
+    expect(auditCall.userEmail).toBeNull();
+    expect(auditCall.employeeName).toBeNull();
+    expect(auditCall.details.trigger).toBe('voice_agent_send');
+
+    // Second leg of the test: operator actor (default) → source='pos'.
+    logAuditMock.mockReset();
+    resetState(); // reset state so the same mock appointment is reusable
+    await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'sms',
+    });
+    const auditCallOperator = logAuditMock.mock.calls[0][0] as {
+      source: string;
+      userEmail: string | null;
+      details: Record<string, unknown>;
+    };
+    expect(auditCallOperator.source).toBe('pos');
+    expect(auditCallOperator.userEmail).toBe('test@example.com');
+    expect(auditCallOperator.details.trigger).toBe('operator_send');
   });
 });

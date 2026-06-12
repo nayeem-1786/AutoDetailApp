@@ -42,6 +42,14 @@ export interface PosAppointment extends Appointment {
    *  re-computes the same value server-side on submit, so a stale UI
    *  snapshot never affects the actual money-handling decision. */
   amount_paid_cents?: number | null;
+  /** Session #149 (Item 3) — surfaced for PaymentLinkAmountModal inline
+   *  advisory. Non-null when the prior payment-link cycle was consumed
+   *  by a customer payment. Producer: `/api/pos/appointments/[id]` GET. */
+  payment_link_paid_at?: string | null;
+  /** Session #149 (Item 3) — companion to payment_link_paid_at; the
+   *  prior link's chosen amount (null when operator chose full-remaining
+   *  at that send). Advisory drops the dollar portion when null. */
+  payment_link_amount_cents?: number | null;
 }
 
 export interface PosStaff {

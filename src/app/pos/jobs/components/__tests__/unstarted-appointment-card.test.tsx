@@ -84,6 +84,12 @@ function makeAppt(overrides: Partial<PosUnstartedAppointment> = {}): PosUnstarte
     ],
     total_amount: 120,
     deposit_amount: 50,
+    // Session #149 (Item 3) — new required fields on PosUnstartedAppointment
+    // for the PaymentLinkAmountModal inline advisory. Default to null
+    // (no prior link cycle consumed) so the existing tests' behavior is
+    // unchanged; tests that want to exercise the advisory pass overrides.
+    payment_link_paid_at: null,
+    payment_link_amount_cents: null,
     scope: 'today_unstarted',
     ...overrides,
   };

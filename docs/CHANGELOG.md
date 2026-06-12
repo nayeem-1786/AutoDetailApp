@@ -6,6 +6,113 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #149 — Payment-link re-send guard + audit_log row (Class (a) Items 3 + 5 combined) (2026-06-12)
+
+Closes Class (a) Items 3 and 5 from Session #146's payment-link lifecycle audit. Combined commit because both items extend `SendPaymentLinkInput`, touch `src/lib/payment-link/send.ts`, and thread through both caller routes (POS operator + voice agent). Architecture established in ADR-0006.
+
+**Item 3 — re-send-after-paid guard (Shape B confirmation, NOT Shape A hard-block):**
+
+Audit-first reframing: the originally-reported bug ("URL becomes payable after re-send on fully-paid appointment") does NOT actually manifest — three layers already block fully-paid (`canSendPaymentLink` UI gate, server line-175 `payment_status='paid'`, server line-241 `remainingCents<=0`). The real bug surface is the partial-paid + previous-link-consumed state (`payment_status='partial'` AND `payment_link_paid_at IS NOT NULL`): the pre-#149 stamp at `send.ts:431` wiped `payment_link_paid_at` unconditionally, exposing same-amount double-charge risk if the operator forgot the prior link had cleared.
+
+Locked Shape B (rejected Shape A hard-block): the helper now reads `payment_link_paid_at` from the appt SELECT and returns a structured `{status: 409, code: 'previous_link_paid', previous_payment: {amount_cents, paid_at}}` BEFORE token mint or dispatch when the guard fires. `confirmResend: true` explicitly bypasses the guard — the designed multi-link deposit+balance flow uses this path on every cycle. Shape A was rejected because the codebase explicitly supports partial-then-rest cycles (PaymentLinkAmountModal's 25/50/75/custom presets, webhook per-PI idempotency at `stripe/route.ts:97-103`, the `payment-link-status-flip` locked test). Hard-blocking re-sends would break a designed feature.
+
+`previous_payment.amount_cents` is the actual paid amount — most-recent `payments.amount` row (ordered DESC by `created_at`); `payment_link_amount_cents` is the secondary source for the UI advisory only. POS dialog (`SendPaymentLinkDialog`) parses the 409 + code and renders an overlay confirmation modal ("Previous link was already paid $X on Y. Send anyway / Cancel"); re-POSTs with `confirm_resend: true` on confirm. `PaymentLinkAmountModal` gained an inline amber advisory ("Previous link was paid $X on Y") that surfaces BEFORE the operator picks an amount — converts the click-time prompt into an informed confirmation. Voice-agent route bubbles the 409 + `instructions_for_agent` (existing `voiceAgentFetch:262-271` passthrough) so the LLM gets the conversational prompt verbatim; tool description updated to require explicit customer confirmation before retrying with `confirm_resend: true` (auto-retry forbidden).
+
+**Item 5 — audit_log row on successful send (Option H, NOT Option R):**
+
+Helper writes `logAudit({...})` after the post-send stamp (canonical `src/lib/services/audit.ts` shape, fire-and-forget). Locked shape (mirrors stripe webhook payment_link confirm at `stripe/route.ts:278-290`): `action: 'update'` + `details.event: 'payment_link_sent'` (stays inside the `AuditAction` TS union without an extension), `entity_type: 'booking'` (matches cancel-orchestration's appointment-lifecycle naming), `entity_label: "Appointment #${id.slice(0,8)} (payment link $X via Y)"` (searchable via admin UI `entity_label ilike`). `details` JSONB carries `event`, `amount_cents`, `chosen_amount_cents`, `remaining_cents_at_send`, `method`, `channels`, `channels_dispatched`, `partial_errors`, `trigger`, `token_reused`, `customer_id`, `scheduled_date`, `appointment_total_cents`.
+
+Actor context flows via a new required `actor: SendPaymentLinkActor` input field (mirrors `CancelOrchestrationActor`). Internal `actorSourceFor()` translates `triggeredBy: 'operator' → 'pos'` and `triggeredBy: 'voice_agent' → 'api'` (matches specialty-callback + Stripe-webhook no-session-actor precedents — no new `'voice_agent'` source value introduced; that's a separately-scoped commit). POS route populates identity from `posEmployee`; voice-agent route omits identity fields entirely (`validateApiKey` returns no identity; Bearer-key is a shared fleet credential). `ipAddress` captured on both paths via `getRequestIp(request)`.
+
+**PII / bearer-credential lockout LOCKED (Option A):** `payment_link_token` and `pay_url` are NEVER logged — token IS the bearer credential for `/pay/${token}`; audit_log readers would gain implicit payment-link bearer access. Customer phone and email are NEVER logged — `customer_id` is the canonical reference. Source-text regression test pins these omissions; future audit-coverage retrofits (receipts, quotes, send-info-sms) follow the same template per ADR-0006.
+
+**Test additions (7 new tests, all reverse-validated):**
+
+- Item 3 #1 — 409 + code='previous_link_paid' fires when `payment_link_paid_at IS NOT NULL` AND `confirmResend` absent
+- Item 3 #2 — bypass: `confirmResend: true` proceeds normally, stamp wipe runs
+- Item 3 #3 — partial-paid scenario (the real bug surface — line-175 `status='paid'` guard does NOT cover this state)
+- Item 5 #4 — audit row written with canonical shape on success
+- Item 5 #5 — audit row NOT written when the guard fires (logAudit not invoked)
+- Item 5 #6 — PII safety: serialized audit payload contains neither token nor phone nor email
+- Item 5 #7 — actor.triggeredBy='voice_agent' → source='api' + null identity; operator → source='pos' + populated identity
+
+Reverse-validation matrix (two neuter passes covering all 7):
+
+| Neuter | Tests that failed (expected set) |
+|---|---|
+| `if (false && payment_link_paid_at && !confirmResend)` | #1, #3, #5 (3 fail) |
+| `if (payment_link_paid_at)` (dropped `!confirmResend`) | #2 (1 fail) |
+| `if (false) await logAudit(...)` | #4, #6, #7 (3 fail) |
+
+Each reversion cleanly returned green on restoration.
+
+**Mock infrastructure changes** (`src/lib/payment-link/__tests__/send.test.ts`):
+
+- `MockAppointment` extended with `payment_link_paid_at` + `payment_link_amount_cents`
+- Payments query mock updated to support the new `.in().order()` chain (helper now reads most-recent payment for `previous_payment.amount_cents`)
+- New `logAuditMock` via `vi.mock('@/lib/services/audit')`
+- New `defaultActor` constant + `send(input)` test wrapper that auto-fills the now-required `actor` field; existing 27 test calls converted to use the wrapper via bulk replace_all
+
+**Data-plumbing extensions for inline advisory:**
+
+- `/api/pos/jobs/[id]` (`JOB_SELECT`) — added `payment_link_paid_at, payment_link_amount_cents` to the appointment embed
+- `/api/pos/jobs` unstarted-appointments listing — same two columns added to the listing SELECT
+- `PosAppointment` (POS components type) — two optional fields added (consumed by job-queue strip via `/api/pos/appointments/[id]`'s `select('*')`)
+- `PosUnstartedAppointment` — two REQUIRED fields added (the strip card mount path)
+- `JobWithAppointment` (jobs/[id] route shape) — two optional fields added
+- `UnstartedRawRow` (jobs/route raw type) — two fields added with number-or-string coercion
+- Test fixture for `unstarted-appointment-card.test.tsx` `makeAppt()` — defaults the two new fields to null
+
+**Test invariants:**
+
+- Helper suite: pre #149 = 27 tests; post = 34 tests (+7); zero failures.
+- Adjacent + broader sweep: 198 test files (7 skip), **3226 tests pass** (66 skip), zero failures.
+- TypeScript: zero new errors. 5 pre-existing TS2556 errors on `main` (`sla-cron.test.ts`, `customer-accept-service.test.ts`) confirmed unchanged via `git stash` re-run on `main`.
+
+**Pre-commit visual verification** (operator localhost:3001 walkthrough, all 3 scenarios passed):
+
+1. Partial-paid re-send (the bug case): amber advisory rendered ("Previous link was paid $50.00 on Jun 12, 9:12 AM"); confirmation modal appeared on Send Link with operator-helpful guidance copy; Cancel correctly aborted (no SMS); Send anyway dispatched ($30.00 SMS).
+2. Clean send (no prior payment): no advisory rendered for fresh appointment; no confirmation modal interrupted; SMS dispatched normally ($1.00 SMS).
+3. Audit log inspection: both Send-anyway and clean-send rows confirmed — `action='update'`, `entity_type='booking'`, `source='pos'`, `user_email` populated, `details.event='payment_link_sent'`, `method='sms'`, `trigger='operator_send'`, `amount_cents` matches sent amount, `customer_id` present, NO `payment_link_token` / phone / email.
+
+**Out-of-scope findings surfaced during walkthrough (NOT in this commit):**
+
+- **Conversation Lifecycle reactivation gap (Class (a) Item #1, deferred to dedicated session).** Operator noticed payment-link SMSes did NOT flip closed conversations back to Open. Pre-existing — `logToConversation: true` writes the message but the conversation status stays Closed. Multi-system scope (lifecycle cron + `last_message_at` writes + admin auto-close/auto-archive settings + UI filter logic). Tomorrow's audit-first session candidate per operator pre-confirmation.
+- **`token_reused: false` test-data gap (minor, not a code bug).** Visual-walkthrough seed SQL only set `payment_link_paid_at` + `payment_link_amount_cents`, NOT `payment_link_token`. Helper correctly minted a fresh token → `token_reused: false`. Production appointments with real prior link state carry the token and report `true`. No commit blocker; flagged for future seed-script improvement.
+
+**Acknowledged out of scope (Class (a) follow-up backlog, NOT closed today):**
+
+- `service-edit.ts:647` post-payment add stuck-paid-status bug (different fix shape — recompute `payment_status` when `total_amount` grows post-payment; separate session)
+- Audit coverage retrofit for operator-initiated customer comms (receipts SMS/email, quote send, send-info-sms voice agent, send-quote-sms voice agent) — pattern established by today's ADR-0006; dedicated session per Class (a) Item 6 lands the byte-symmetric helpers
+- Conversation Lifecycle reactivation (Class (a) Item #1, see above)
+- Payment Activity UI on AppointmentDetailDialog (Class (a) Item #2, separate session)
+- Email send logging (Class (a) Item #4, separate session)
+- Hand-rolled Supabase mocks workstream (cross-cutting, separate workstream)
+
+**Files modified (15 total — 1 new ADR + 14 modified)**:
+
+- NEW: `docs/adr/0006-operator-comm-audit-log-and-confirm-codes.md`
+- `docs/adr/README.md` (index row added)
+- `docs/CHANGELOG.md` (this entry)
+- `src/lib/payment-link/send.ts` (actor input, actorSourceFor, payment_link_paid_at SELECT, mostRecentPaymentCents lookup, re-send guard, audit_log write)
+- `src/lib/payment-link/__tests__/send.test.ts` (mock chain update, logAudit mock, defaultActor + send wrapper, 7 new tests)
+- `src/app/api/pos/appointments/[id]/send-payment-link/route.ts` (parse confirm_resend, build operator actor, bubble 409 verbatim)
+- `src/app/api/voice-agent/send-payment-link/route.ts` (parse confirm_resend, build voice_agent actor, bubble 409 + instructions_for_agent)
+- `src/app/api/pos/jobs/[id]/route.ts` (JOB_SELECT extension + JobWithAppointment type)
+- `src/app/api/pos/jobs/route.ts` (unstarted-appointments SELECT + UnstartedRawRow + mapping)
+- `src/app/pos/components/appointments/types.ts` (PosAppointment +2 fields)
+- `src/app/pos/jobs/components/schedule-types.ts` (PosUnstartedAppointment +2 fields)
+- `src/app/pos/jobs/components/job-detail.tsx` (local appointment type +2 fields, modal prop thread-through)
+- `src/app/pos/jobs/components/job-queue.tsx` (modal prop thread-through)
+- `src/app/pos/jobs/components/__tests__/unstarted-appointment-card.test.tsx` (fixture defaults)
+- `src/components/jobs/payment-link-amount-modal.tsx` (advisory props + amber notice render)
+- `src/components/jobs/send-payment-link-dialog.tsx` (rewritten as fragment with confirmation modal overlay + `performSend(method, confirmResend)` factoring)
+- `src/lib/sms-ai/tools.ts` (send_payment_link tool description gains confirm_resend semantics)
+
+**Class (a) backlog drops to 4 items pending: #1 Conversation Lifecycle reactivation, #2 Payment Activity UI, #4 Email send logging, #6 audit-coverage retrofit.**
+
+---
+
 ## Session #148 — Cancel Appointment dialog Bug 1 two-mode shell + chip-based reason picker (Commit B) (2026-06-10)
 
 Closes Bug 1 from yesterday's Cancel Appointment audit (Session #147 paired Bug 2 + Bug 1 dual investigation, Commit B carried forward). Locked design: two-mode dialog shell — Mode A for `amount_paid_cents === 0` (no Refund Pathway selector, simpler UX); Mode B for `amount_paid_cents > 0` (full Theme D.1/D.2 surface preserved). Both modes share the chip-based reason picker imported from a new canonical module.
