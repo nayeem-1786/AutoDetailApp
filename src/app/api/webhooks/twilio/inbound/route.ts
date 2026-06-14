@@ -396,14 +396,33 @@ export async function POST(request: NextRequest) {
 
       conversation = newConv;
     } else {
-      const wasClosedOrArchived = conversation.status === 'closed' || conversation.status === 'archived';
+      // Class (a) Item #1 (Session #150) — reactivation was inline here
+      // pre-#150 with channel='voice' on the banner as a render hack
+      // (`message-bubble.tsx`'s `isNotification` predicate triggered on
+      // either `channel='voice'` OR `sender_type='system'`; the OR makes
+      // the channel hack redundant). The shared helper
+      // `reactivateIfClosed` now owns status flip + banner insert with
+      // canonical `channel='sms'` and the AI-context status-marker
+      // contract (no `metadata.notificationType`). Banner mode
+      // `'customer_re_engaged'` matches the existing copy for the
+      // customer-initiated inbound case.
+      //
+      // Status flip is handled by the helper, NOT inline here, so the
+      // `updates` object below drops `status: 'open'` — the conversation
+      // row's `last_message_at`/`last_message_preview`/`unread_count`/
+      // `customer_id` updates are independent of the reactivation write.
+      const { reactivateIfClosed } = await import(
+        '@/lib/utils/conversation-helpers'
+      );
+      await reactivateIfClosed(admin, conversation.id, {
+        banner: 'customer_re_engaged',
+      });
 
       const updates: Record<string, unknown> = {
         last_message_at: new Date().toISOString(),
         last_message_preview: body.substring(0, 200),
         last_channel: 'sms',
         unread_count: (conversation.unread_count || 0) + 1,
-        status: 'open',
       };
       if (customerId && !conversation.customer_id) {
         updates.customer_id = customerId;
@@ -413,19 +432,6 @@ export async function POST(request: NextRequest) {
         .from('conversations')
         .update(updates)
         .eq('id', conversation.id);
-
-      // Insert system message when a closed/archived conversation is reopened
-      // Use channel 'voice' so it renders as a notification bar, not a chat bubble
-      if (wasClosedOrArchived) {
-        await admin.from('messages').insert({
-          conversation_id: conversation.id,
-          direction: 'outbound',
-          body: 'Conversation reopened — customer re-engaged',
-          sender_type: 'system',
-          status: 'delivered',
-          channel: 'voice',
-        });
-      }
     }
 
     // -------------------------------------------------------------------
@@ -535,11 +541,16 @@ export async function POST(request: NextRequest) {
             .order('created_at', { ascending: true })
             .limit(100);
 
-          // Keep system SMS in AI context (notifications the customer may reply to)
-          // but exclude voice-channel system messages (call summaries, consent changes)
-          const history = (allHistory || []).filter(
-            (msg) => !(msg.sender_type === 'system' && msg.channel === 'voice')
+          // Class (a) Item #1 (Session #150) — AI-history inclusion predicate.
+          // Full contract documented at `shouldIncludeInAiHistory` jsdoc in
+          // `src/lib/utils/conversation-helpers.ts`. Extracted to make the
+          // predicate testable as a unit + visible alongside the writer-side
+          // contract (`reactivateIfClosed` lives in the same module and
+          // refers to the same `metadata.notificationType` discriminator).
+          const { shouldIncludeInAiHistory } = await import(
+            '@/lib/utils/conversation-helpers'
           );
+          const history = (allHistory || []).filter(shouldIncludeInAiHistory);
 
           // Build customer context for known customers
           let customerCtx: CustomerContext | undefined;

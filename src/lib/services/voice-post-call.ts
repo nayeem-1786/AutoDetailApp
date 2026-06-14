@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
+import { reactivateIfClosed } from '@/lib/utils/conversation-helpers';
 import { generateConversationSummary } from '@/lib/services/conversation-summary';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
@@ -260,11 +261,23 @@ export async function processVoiceCallEnd(
     }
     conversation = newConv;
   } else {
+    // Class (a) Item #1 (Session #150) — reactivation via shared helper.
+    // A customer phone call IS customer-initiated activity, so banner mode
+    // 'customer_re_engaged' matches the canonical inbound-customer wording.
+    // Pre-#150 this branch wrote `status: 'open'` unconditionally in the
+    // inline updates but emitted NO banner — refactor adopts the canonical
+    // reactivation pattern (banner + status flip) and removes the inline
+    // status write (helper owns it). Behavior change: voice calls to
+    // previously-closed conversations now produce a "Conversation reopened
+    // — customer re-engaged" banner alongside the call-summary message.
+    await reactivateIfClosed(admin, existingConv.id, {
+      banner: 'customer_re_engaged',
+    });
+
     const updates: Record<string, unknown> = {
       last_message_at: now,
       last_message_preview: messageBody.substring(0, 200),
       last_channel: 'voice',
-      status: 'open',
     };
     if (!existingConv.customer_id && customer?.id) {
       updates.customer_id = customer.id;

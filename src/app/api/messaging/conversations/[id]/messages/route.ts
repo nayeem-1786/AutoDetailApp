@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { sendSms } from '@/lib/utils/sms';
+import { reactivateIfClosed } from '@/lib/utils/conversation-helpers';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 
@@ -144,17 +145,23 @@ export async function POST(
     return NextResponse.json({ error: msgError.message }, { status: 500 });
   }
 
+  // Class (a) Item #1 (Session #150) — reactivation via shared helper.
+  // Operator-typed reply path passes `banner: null` because the operator's
+  // own typed `messages` row (inserted above at lines 128-141) IS the
+  // boundary marker — no separate "Conversation reopened" banner needed.
+  // Helper handles the status flip; the local `updates` object below
+  // covers the remaining conversation-level tracking (last_message_at,
+  // preview, channel, is_ai_enabled). Pre-#150 the status flip was inline
+  // here; refactor to the helper removes one of the THREE inline
+  // implementations the prior audit catalogued.
+  await reactivateIfClosed(admin, id, { banner: null });
+
   // Update conversation
   const updates: Record<string, unknown> = {
     last_message_at: new Date().toISOString(),
     last_message_preview: messageBody.slice(0, 100),
     last_channel: 'sms',
   };
-
-  // Reopen if closed
-  if (conversation.status === 'closed' || conversation.status === 'archived') {
-    updates.status = 'open';
-  }
 
   // If staff is replying to an AI-enabled conversation, disable AI (human took over)
   if (conversation.is_ai_enabled) {

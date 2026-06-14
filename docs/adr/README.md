@@ -69,3 +69,4 @@ above, write or update an ADR alongside the usual CHANGELOG entry.
 | [0004](0004-receipt-four-surface-synchronization.md) | Receipt 4-surface synchronization rule | Accepted | 2026-05-13 |
 | [0005](0005-timezone-policy-pacific.md) | Timezone policy — America/Los_Angeles | Accepted | 2026-05-13 |
 | [0006](0006-operator-comm-audit-log-and-confirm-codes.md) | Operator-initiated customer comms — audit_log shape + structured confirmation codes | Accepted | 2026-06-12 |
+| [0007](0007-conversation-reactivation-and-ai-context-inclusion.md) | Conversation lifecycle reactivation + AI-context inclusion contract | Accepted | 2026-06-13 |

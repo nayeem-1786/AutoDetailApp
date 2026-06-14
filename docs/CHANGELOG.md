@@ -6,6 +6,121 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #150 — Conversation lifecycle reactivation on new activity (Class (a) Item #1) (2026-06-13)
+
+Closes Class (a) Item #1 from the cumulative #146 + #149 audit backlog. Architecture in ADR-0007. Surfaced during #149's visual walkthrough — closed conversations receiving payment-link SMSes silently stayed Closed; the operator pre-empirical reproduction confirmed the gap (Mon Jun 8 conversation auto-close banner + two payment-link SMSes landing on June 8 + 9, conversation stuck Closed). Multi-system scope.
+
+**Primary fix — `reactivateIfClosed()` helper (`src/lib/utils/conversation-helpers.ts`):**
+
+Pre-#150 the codebase had THREE inline reactivation implementations (Twilio inbound at `webhooks/twilio/inbound/route.ts:399-428`, operator-typed reply at `messaging/conversations/[id]/messages/route.ts:155-157`, voice-post-call at `services/voice-post-call.ts:262-277`) with subtly different shapes; the canonical `sendSms({logToConversation:true})` chokepoint at `src/lib/utils/sms.ts:185-195` PLUS 10+ paths flowing through it didn't reactivate at all. The smoking gun: chokepoint's `convUpdate` object wrote `last_message_at`, `last_message_preview`, `last_channel` (+ optional notification trackers) but no `status` field — every system-initiated outbound SMS silently left closed conversations Closed.
+
+New canonical helper:
+```ts
+reactivateIfClosed(supabase, conversationId, options?: {
+  banner?: 'customer_re_engaged' | 'automated_activity' | null
+}): Promise<{ wasReactivated: boolean }>
+```
+
+Reads status. If `'closed' | 'archived'`: UPDATE → `'open'` + optional banner INSERT. Banner mode discriminates origin (`'customer_re_engaged'` for inbound customer, `'automated_activity'` for system-outbound, `null` for operator-typed reply where the typed message itself is the marker). Defaults to `'automated_activity'` when omitted. Fire-and-forget on errors (mirrors `logAudit` from ADR-0006). FIVE injection sites (3 pre-existing inline refactored + 2 new chokepoint integrations).
+
+**INVARIANT established (writer + reader contract for AI-context inclusion):**
+
+A `sender_type='system'` message enters Claude's AI history iff `metadata.notificationType` is set. Customer-facing notifications (payment links, receipts, quote reminders, voice-agent SMS dispatches) ALWAYS set it; pure status markers (reactivation banners, pg_cron auto-close banner, manual close audit, staff-notification audit) MUST omit it.
+
+Reader contract: `shouldIncludeInAiHistory()` exported from `conversation-helpers.ts`, consumed by `webhooks/twilio/inbound/route.ts:540`. Predicate: `if sender_type !== 'system' → include; if channel === 'voice' → exclude; if !metadata.notificationType → exclude; else include`. Replaces the pre-#150 `!(sender_type==='system' && channel==='voice')` predicate that let SMS status markers (auto-close banner etc.) into Claude's context — the prompt-poisoning vector the operator's #149-followup audit caught.
+
+**CRITICAL refutation locked during the design phase:** the originally-proposed blanket `sender_type !== 'system'` filter would have BROKEN designed AI behavior. Customer-facing notifications are deliberately kept in AI history because customers reply to them ("I paid it", "yes reschedule") and the AI needs the prior outbound notification for context. The audit-first discipline pattern caught this would-be regression before any code was written — test 8 in the helper suite is the load-bearing lock against it.
+
+**AI filter byte-level wording:** "Keep system SMS in AI context (notifications the customer may reply to) but exclude voice-channel system messages (call summaries, consent changes)" — the pre-#150 deliberate-design comment that informed the refined predicate. Both reader and writer sites carry the invariant in jsdoc.
+
+**Defensive guard for PostgREST silent-no-op (post-deploy-verification add, the operator caught it):**
+
+Visual walkthrough of Scenario 1 on dev surfaced a real anomaly — conversation `b0deab43-ba18-44e4-aea8-49cb284cc28f` reactivation banner inserted at 01:26:09.224 UTC + payment-link SMS at 01:26:09.286, BUT conversation.status stayed `'closed'`. Operator's reconstruction confirmed `updated_at` changed at 02:01:49 (35 min later, source unidentified — no banner, no audit row, no code-grep match) with status still `'closed'`. Mechanism: the helper's `.update().eq()` chain returned `error: null` despite affecting 0 rows; pre-fix code had no defense and returned `wasReactivated: true` with a banner.
+
+**Fix:** helper's UPDATE chain now ends in `.select('id, status')` (forces PostgREST `Prefer: return=representation`), then validates BOTH `data.length > 0` (0-row defense) AND `data[0].status === 'open'` (post-update mismatch defense). Defense-in-depth — either layer alone is sufficient; both together catch every silent-no-op variant. Failure logs `[ConversationHelper] reactivateIfClosed: UPDATE affected 0 rows (silent no-op)` or `post-UPDATE status is not open` with `conversationId` + observed state for forensic follow-up. Tests 12 + 13 reverse-validated by removing both defenses simultaneously (Pass F+G) — both fail as expected; restoration green.
+
+**Root-cause investigation findings (the WHY remains opaque):** comprehensive grep ruled out all programmatic `status='closed'` writers outside the manual-close PATCH endpoint (which would have inserted a "Conversation closed by X" banner); RLS on conversations is permissive (`USING (true)`) AND admin client uses service_role which bypasses RLS; no FORCE ROW LEVEL SECURITY; only trigger is `set_conversations_updated_at`; CHECK constraint allows `'open'`. The exact PostgREST mechanism (transient SDK quirk, row-lock contention between findOrCreate's customer_id UPDATE and the immediate helper UPDATE on the same row, some `Prefer` header edge case) is unknowable without a runtime trace. The defense protects regardless of root cause — production observation post-deploy will tell us how often it fires.
+
+**Site-to-banner-mode mapping:**
+
+| Site | Banner option | Refactor type |
+|---|---|---|
+| `src/lib/utils/sms.ts:200` (chokepoint) | default `'automated_activity'` | NEW — primary fix |
+| `src/lib/utils/conversation-helpers.ts:54` (existing-row branch) | default `'automated_activity'` | NEW — belt-and-suspenders; benefits quote-reminders cron too |
+| `webhooks/twilio/inbound/route.ts:411-414` | `'customer_re_engaged'` | REFACTOR — replaces inline; new banner uses canonical `channel='sms'` (was the redundant `channel='voice'` rendering hack pre-#150) |
+| `messaging/conversations/[id]/messages/route.ts:154` | `null` | REFACTOR — operator's typed message is the marker, no banner |
+| `voice-post-call.ts:262-274` | `'customer_re_engaged'` | REFACTOR — BEHAVIOR CHANGE: closed convs now get a "customer re-engaged" banner on inbound call (pre-#150 flipped status silently without a banner) |
+
+**14 tests, all reverse-validated:**
+
+| # | Test | Reverse-validation |
+|---|---|---|
+| 1×2 | helper reactivates + writes banner with correct trigger | Pass A (banner disabled) — fails as expected |
+| 2 | helper no-op when already open | Pass B (early-return removed) — fails as expected |
+| 3 | sendSms chokepoint integration contract | Pass A — fails as expected |
+| 4 | Twilio inbound customer_re_engaged + channel='sms' | Pass A — fails as expected |
+| 5 | operator-reply null banner: status flip without banner row | Pass C (null coalesced to default) — fails as expected |
+| 6 | AI filter EXCLUDES pg_cron auto-close banner | Pass D (pre-#150 predicate) — fails as expected |
+| 7 | AI filter EXCLUDES new reactivation banner | Pass D — fails as expected |
+| 8 | **AI filter KEEPS payment-link notification** | Pass E (blanket `sender_type!=='system'`) — fails as expected — **the load-bearing lock against the originally-proposed regression** |
+| (companion) | non-system messages always kept | n/a |
+| (companion) | voice-channel system messages always excluded | n/a |
+| 12 | helper returns `wasReactivated:false` + skips banner on 0-row UPDATE | Pass F+G (both silent-no-op defenses disabled) — fails as expected |
+| 13 | helper returns `wasReactivated:false` + skips banner on status mismatch | Pass G — fails as expected |
+| (companion) | happy path: UPDATE returns single row with status=open → reactivated + banner inserted | confirms guard doesn't over-block valid reactivations |
+
+**Test infrastructure changes:** new `makeStub()` helper with chainable conversations + messages mocks; `updateRowsOverride` option simulates PostgREST silent-no-op (`{data: [], error: null}`) and post-update mismatch (`{data: [{status: 'closed'}], error: null}`) for Tests 12 + 13.
+
+**Test invariants:**
+
+- Helper suite: pre #150 = 0; post = 14 (new file). Zero failures, all 7 reverse-validation passes (A through G) green after restoration.
+- Broader sweep: 199 test files (7 skip), **3,240 tests pass** (66 skip), zero failures. Pre-#150 baseline (#149 close): 3,226 across 198 files. Δ = +14 tests, +1 file, 0 regressions.
+- TypeScript: zero new errors. 5 pre-existing TS2556 on `main` (`sla-cron.test.ts`, `customer-accept-service.test.ts`) confirmed unchanged.
+
+**Pre-commit visual verification — both rounds (operator localhost:3000 walkthrough):**
+
+**Round 1 (caught the bug):**
+- Scenario 1 partial-paid re-send → reactivation banner appeared, payment-link SMS delivered, BUT post-test SQL showed `conversation.status = 'closed'` (banner inserted but status didn't flip — the silent-no-op bug surface)
+- Diagnostic queries: full message history (no auto-close banner between 01:26:09 and 02:01:49 → pg_cron innocent), current state (`status='closed'`, `last_message_at='01:26:09'` confirming chokepoint UPDATE worked), audit_log (no operator action). H1 confirmed: helper UPDATE silently no-op'd.
+
+**Round 2 (verified the defensive fix):**
+- Conversation `b0deab43` reset to `status='closed'`
+- Payment-link SMS triggered via POS
+- Result: `status='open'`, "Conversation reopened — automated activity" banner inserted at 8:23 PM PST, payment link SMS delivered immediately after, conversation now visible in Admin Messaging Open pill, zero `[ConversationHelper]` error lines in dev console. The defensive guards (`.select()` + 0-row check + status verification) protected against potential PostgREST silent-no-op anomalies but did NOT need to fire on this run — they remain in place for future protection.
+
+**Acknowledged out of scope (Class (a) follow-up backlog):**
+
+- STOP/START path reactivation policy decision (current behavior: customer texting STOP/START to a closed conversation leaves it closed; defensible as opt-out semantics but inconsistent — separate operator decision)
+- Bot-badge unreachable code at `message-bubble.tsx:124-159` (post-#150 the OR predicate at line 113-115 routes ALL `sender_type='system'` to NotificationBar; the chat-bubble Bot-badge branch can never render — flagged for cleanup)
+- Backfill existing `channel='voice'` system banner rows to canonical `channel='sms'` (one-off SQL migration; existing data preserved as-is, new writes use canonical shape)
+- Fine-grained sender attribution (SMS agent vs voice agent vs cron) — separate design session if operator wants discrete trigger labels
+- Dead `/api/messaging/send` route cleanup (zero callers; no reactivation logic — latent gap if resurrected)
+- Misleading comment at `customer-accept-service.ts:262` (claims `logToConversation:true` writes to `sms_conversations`; actually writes to `conversations` + `messages`)
+- Preview length unification (`sms.ts:188` uses 200, `messaging/page.tsx:272` optimistic uses 100 — visible flicker on operator typed reply)
+- AI-context inclusion strategy for voice-call summaries (currently excluded; future operator decision whether call summaries should inform AI context)
+- `channel='system'` value via ALTER CHECK migration (longer-term cleanup — eliminates the `channel='voice'` rendering hack on legacy data)
+- Root-cause identification of the PostgREST silent-no-op (defended-against but mechanism unknown — production telemetry post-deploy will tell us if/when it fires)
+
+**Strategic backlog addition (out of scope today, FUTURE multi-session):**
+
+- **Staff SMS Agent** — detect inbound SMS from numbers matching staff records, route to a separate AI agent with capabilities scoped by staff role. Detailer can query active customers + send payment links to their jobs; Manager adds schedule/metric queries; Super-admin gets full P&L access. Multi-session scope: phone-to-staff lookup + auth boundary in Twilio inbound webhook, new staff agent system prompt + tool catalog, role-permission mapping, security model (verification codes for sensitive actions, amount caps, audit_log integration, suspend/revoke), Admin UI for staff agent activity monitoring + off-boarding. Triggers dedicated design audit session AFTER Item #1 lands and is production-validated.
+
+**Files modified (10 total — 1 new ADR + 1 new test file + 8 modified):**
+
+- NEW: `docs/adr/0007-conversation-reactivation-and-ai-context-inclusion.md`
+- NEW: `src/lib/utils/__tests__/conversation-reactivation.test.ts` (14 tests, all reverse-validated)
+- `docs/adr/README.md` (index row added)
+- `docs/CHANGELOG.md` (this entry)
+- `src/lib/utils/conversation-helpers.ts` (new `reactivateIfClosed()` + `shouldIncludeInAiHistory()` + existing-row branch reactivation + defensive `.select()` guard)
+- `src/lib/utils/sms.ts` (chokepoint integration — explicit `reactivateIfClosed` call after the conversation update)
+- `src/app/api/webhooks/twilio/inbound/route.ts` (inline reactivation refactored to helper + AI filter now uses `shouldIncludeInAiHistory`)
+- `src/app/api/messaging/conversations/[id]/messages/route.ts` (inline status flip refactored to helper with `banner: null`)
+- `src/lib/services/voice-post-call.ts` (inline status flip refactored to helper with `banner: 'customer_re_engaged'`)
+
+**Class (a) backlog drops to 3 items pending:** #2 Payment Activity UI, #4 Email send logging, #6 audit-coverage retrofit (the ADR-0006 sibling work for receipts/quotes/send-info-sms).
+
+---
+
 ## Session #149 — Payment-link re-send guard + audit_log row (Class (a) Items 3 + 5 combined) (2026-06-12)
 
 Closes Class (a) Items 3 and 5 from Session #146's payment-link lifecycle audit. Combined commit because both items extend `SendPaymentLinkInput`, touch `src/lib/payment-link/send.ts`, and thread through both caller routes (POS operator + voice agent). Architecture established in ADR-0006.

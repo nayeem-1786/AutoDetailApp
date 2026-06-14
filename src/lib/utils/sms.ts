@@ -159,7 +159,7 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
     if (options?.logToConversation) {
       try {
         const { createAdminClient: createAdmin } = await import('@/lib/supabase/admin');
-        const { findOrCreateConversation } = await import('@/lib/utils/conversation-helpers');
+        const { findOrCreateConversation, reactivateIfClosed } = await import('@/lib/utils/conversation-helpers');
         const admin = createAdmin();
 
         const convId = options.conversationId
@@ -193,6 +193,18 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
             convUpdate.last_notification_at = new Date().toISOString();
           }
           await admin.from('conversations').update(convUpdate).eq('id', convId);
+
+          // Class (a) Item #1 (Session #150) — reactivate the conversation
+          // if it had been auto-closed or archived. This is the canonical
+          // chokepoint for system-initiated outbound SMS; without this
+          // call the conversation stays Closed even after the customer
+          // visibly receives a fresh payment-link / receipt / reminder.
+          // Default banner ('automated_activity') is the right choice
+          // here — the trigger is system-initiated. Helper never throws;
+          // own try/catch logs failures, conversation logging never
+          // breaks the SMS send. See `reactivateIfClosed` jsdoc for the
+          // AI-context invariant the banner respects.
+          await reactivateIfClosed(admin, convId);
         }
       } catch (convErr) {
         // Never fail the SMS send due to conversation logging errors
