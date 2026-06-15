@@ -57,47 +57,55 @@ const NOTIFICATION_LABEL_OVERRIDES: Record<string, string> = {
 };
 
 /**
- * Notification bar: voice channel messages and system events (both voice and SMS).
- * Centered, no bubble, small gray text. System SMS shows notification type label.
+ * Format a `metadata.notificationType` machine string for operator display.
+ *
+ * `null`/`undefined`/empty → returns `null` (caller renders bare "Auto" badge).
+ * Defensive: any future notificationType missing from the override map falls
+ * back to generic snake_case → Title Case rather than crashing or bleeding
+ * raw snake_case through to the UI.
+ */
+function formatNotificationLabel(notificationType: string | null | undefined): string | null {
+  if (!notificationType) return null;
+  return (
+    NOTIFICATION_LABEL_OVERRIDES[notificationType] ??
+    notificationType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+/**
+ * Notification bar: voice channel messages and system status-marker events.
+ * Centered, no bubble, small gray text. Voice messages render call duration.
+ *
+ * Status markers reach this branch via the `isStatusMarker` predicate in
+ * MessageBubble — system-sent rows with NO `metadata.notificationType`
+ * (reactivation banner, auto-close banner). Customer-facing system SMS
+ * (payment links, receipts, job-complete, etc.) carry a notificationType
+ * and route to ChatBubble instead — see Session #154 fix.
  */
 function NotificationBar({ message }: { message: Message }) {
   const isVoice = message.channel === 'voice';
-  const isSystemSms = message.sender_type === 'system' && message.channel === 'sms';
-
-  // Notification type label from metadata (e.g., "job_complete" → "Job Complete").
-  // Issue 46: override map takes precedence; falls through to generic
-  // snake_case → Title Case for unmapped types (job_complete,
-  // appointment_confirmed, receipt_sent, etc.).
-  const notifLabel = isSystemSms && message.metadata?.notificationType
-    ? NOTIFICATION_LABEL_OVERRIDES[message.metadata.notificationType as string]
-        ?? message.metadata.notificationType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
-    : null;
 
   // Strip the "Phone call (X:XX)\n" prefix from body when we render duration separately
   let displayBody = message.body;
   if (isVoice && message.voice_duration_seconds != null) {
     displayBody = displayBody.replace(/^Phone call\s*\(\d+:\d+\)\s*\n?/, '');
   }
-  // Truncate long system SMS bodies
-  if (isSystemSms && displayBody.length > 120) {
-    displayBody = displayBody.substring(0, 120) + '...';
-  }
 
   return (
     <div className="flex justify-center py-1.5">
       <div className="max-w-[85%] rounded-md bg-gray-50 px-3 py-1.5 dark:bg-gray-800">
         <div className="flex items-center justify-center gap-1.5">
-          {isVoice && <Phone className="h-3 w-3 shrink-0 text-gray-400" />}
-          {isSystemSms && <MessageSquare className="h-3 w-3 shrink-0 text-blue-400" />}
+          {isVoice ? (
+            <Phone className="h-3 w-3 shrink-0 text-gray-400" />
+          ) : (
+            <MessageSquare className="h-3 w-3 shrink-0 text-blue-400" />
+          )}
           <p className="text-center text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-words">
             {isVoice && message.voice_duration_seconds != null && (
               <span className="font-medium text-gray-600 dark:text-gray-300">
                 Phone call ({formatDuration(message.voice_duration_seconds)})
                 {displayBody ? ' — ' : ''}
               </span>
-            )}
-            {notifLabel && (
-              <span className="font-medium text-blue-600 dark:text-blue-400">{notifLabel} — </span>
             )}
             {displayBody}
           </p>
@@ -109,20 +117,49 @@ function NotificationBar({ message }: { message: Message }) {
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
-  // Notification bars: voice channel OR any system message (including system SMS)
-  const isNotification =
-    message.channel === 'voice' ||
-    message.sender_type === 'system';
+  // Predicate-based routing (Session #154, 2026-06-14):
+  //
+  //   - Voice-channel messages → NotificationBar (always; centered marker
+  //     for call-summary entries).
+  //   - System-sent SMS WITHOUT `metadata.notificationType` → NotificationBar
+  //     (status markers: reactivation banner, auto-close banner, etc.).
+  //   - System-sent SMS WITH `metadata.notificationType` → ChatBubble
+  //     (customer-facing notifications: payment links, receipts, job-complete,
+  //     appointment-confirmed, agent quote sends, etc.). Renders full body
+  //     with no truncation; "Auto · {label}" badge surfaces the trigger.
+  //   - Inbound + staff + AI → ChatBubble (unchanged).
+  //
+  // The `metadata.notificationType` predicate mirrors the load-bearing
+  // contract codified in Session #150 at
+  // `src/lib/utils/conversation-helpers.ts:259-269` and the AI-context
+  // filter at `src/app/api/webhooks/twilio/inbound/route.ts:540-545`:
+  // presence = customer-facing notification (AI sees, customer received);
+  // absence = internal status marker (AI ignores, operator-visible only).
+  //
+  // Pre-#154 ALL `sender_type='system'` SMS rendered as centered NotificationBar
+  // with a 120-char substring truncation — payment-link URLs >120 chars
+  // displayed as "smartdetailsautospa.com/pay/abc..." (truncated mid-URL),
+  // and the operator could not retrieve the full URL from the thread view.
+  // Routing the customer-facing subset to ChatBubble eliminates the
+  // truncation AND restores the chat-bubble system variant first added in
+  // commit 11d4ad00c (2026-03-26) that 08532a933 (2026-03-30) inadvertently
+  // orphaned when introducing the unified-system-SMS UI for status markers.
+  const isStatusMarker =
+    message.sender_type === 'system' && !message.metadata?.notificationType;
+  const isNotification = message.channel === 'voice' || isStatusMarker;
 
   if (isNotification) {
     return <NotificationBar message={message} />;
   }
 
-  // Chat bubbles: all SMS messages (including system-sent SMS)
+  // Chat bubbles: all SMS messages (including notification-bearing system SMS)
   const isOutbound = message.direction === 'outbound';
   const isAi = message.sender_type === 'ai';
   const isSystemSms = message.sender_type === 'system' && message.channel === 'sms';
   const isFailed = message.status === 'failed';
+  const notifLabel = isSystemSms
+    ? formatNotificationLabel(message.metadata?.notificationType)
+    : null;
 
   const senderName = isOutbound
     ? isSystemSms
@@ -155,7 +192,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {isSystemSms && isOutbound && (
             <span className="mb-0.5 flex items-center gap-1 text-xs font-medium opacity-75">
               <Bot className="h-3 w-3" />
-              Auto
+              {notifLabel ? `Auto · ${notifLabel}` : 'Auto'}
             </span>
           )}
           <p className="whitespace-pre-wrap break-words">{message.body}</p>

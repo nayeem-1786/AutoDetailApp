@@ -269,7 +269,7 @@ export default function MessagingPage() {
             ? {
                 ...c,
                 last_message_at: new Date().toISOString(),
-                last_message_preview: body.slice(0, 100),
+                last_message_preview: body.substring(0, 200),
               }
             : c
         )

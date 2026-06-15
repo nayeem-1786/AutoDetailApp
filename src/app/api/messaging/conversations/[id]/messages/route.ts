@@ -159,7 +159,7 @@ export async function POST(
   // Update conversation
   const updates: Record<string, unknown> = {
     last_message_at: new Date().toISOString(),
-    last_message_preview: messageBody.slice(0, 100),
+    last_message_preview: messageBody.substring(0, 200),
     last_channel: 'sms',
   };
 
