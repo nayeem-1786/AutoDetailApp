@@ -6,6 +6,41 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Layer 5 Phase A — SMS AI v2 global flip (2026-06-17)
+
+Flipped `sms_ai_v2_globally_enabled` to `true`. All inbound SMS now routes through SMS AI v2 (was: allowlisted phones only — `+13107564789`, `+14243396994`, `+13103101445`). v1 fallback path remains in code at `src/app/api/webhooks/twilio/inbound/route.ts:536+` but is now unreachable for any phone on live traffic; the `sms_ai_v2_kill_switch` flag is the only path back to v1 (instant DB flip, no deploy required — see `docs/dev/SMS_AI_V2_ROLLBACK.md`).
+
+**Motivation:** 2026-06-17 ~22:00 PST diagnostic confirmed v1 was silently dropping inbound SMS for non-allowlisted phones — `+13109461688` sent 7 inbound messages between 21:02 and 21:10 with `is_ai_enabled=true` + `status='open'` and received zero AI replies. v2 worked correctly for allowlisted phones (`+13107564789` got a reply in 4 seconds). Customer-facing production gap.
+
+**Pre-flip audit (read-only, no code changes):**
+- `feature-flag.ts` (`shouldUseSmsAiV2`) — decision order `kill_switch → globallyEnabled → allowlist` unchanged from Layer 4 ship. Post-flip, `globallyEnabled=true` returns `true` for every phone; allowlist becomes redundant dead code (harmless, intentionally left intact).
+- `webhook/twilio/inbound/route.ts:498-534` — v2 routing block sits after all legacy gates (signature/STOP/two_way_sms/conversation create/inbound INSERT/`is_ai_enabled`/audience pills/rate-limit/business hours). On `shouldUseSmsAiV2=true`: fire-and-forget `runV2AgentInBackground` + immediate TwiML 200 return. On false/throw: fall through to legacy `getAIResponse()` at line 536+. Safe-default semantics intact.
+- `background-dispatch.ts` + `agent-runner.ts` — production-mature (~2,446 lines across 6 modules; Layer 4 errata `channel='sms'` shipped 2026-05-20).
+
+**Acknowledged non-blocking concerns surfaced in audit (C1-C5):** audience + per-conversation gates still apply post-flip (correct); legacy specialty-pivot block + `staff_notification_inbound_specialty` template become unreachable (deletion deferred to Phase C/D); rate-limit shared across v1/v2; Session #150 reactivation runs before v2 routing decision.
+
+**Migration:** `supabase/migrations/20260617223520_flip_sms_ai_v2_globally_enabled.sql` — single idempotent `UPDATE business_settings SET value='true'::jsonb WHERE key='sms_ai_v2_globally_enabled' AND value='false'::jsonb`. Guard prevents no-op re-runs from accidentally flipping a manually-rolled-back env. Applied via `supabase db push --linked` per locked workflow.
+
+**Post-flip verification (`supabase db query --linked`):**
+
+| key | value | updated_at |
+|---|---|---|
+| `sms_ai_v2_enabled_phones` | `["+13107564789","+14243396994","+13103101445"]` | 2026-05-20 (unchanged) |
+| `sms_ai_v2_globally_enabled` | `true` | 2026-06-17 22:35:50 (flipped) |
+| `sms_ai_v2_kill_switch` | `false` | 2026-05-19 (unchanged) |
+
+**Rollback runbook:** new `docs/dev/SMS_AI_V2_ROLLBACK.md` documents the two rollback paths (kill_switch flip — instant, full v1 fallback; OR global_enabled re-flip — back to allowlist-only) plus the Layer 5 phase timeline so future operators understand which rollback path is viable at each phase.
+
+**ROADMAP:** Workstream A Layer 5 row updated to "🟡 Phase A done; Phase B monitoring; Phase C v1 deletion pending."
+
+**No code changes this session.** All source files in `src/lib/sms-ai/*`, `src/lib/services/messaging-ai.ts`, `src/app/api/webhooks/twilio/inbound/route.ts`, and the admin UI at `/admin/settings/messaging` are untouched. Phase C (legacy code deletion) is a separate session.
+
+**Gates:** tsc 0 errors, lint baseline preserved, vitest baseline preserved (no test changes this session — migration + docs only). Build + deploy clean.
+
+**Phase B (operator-driven post-deploy monitoring):** operator sends test SMS from a non-allowlisted phone → verifies AI reply via v2 path (PM2 log `[SmsAiV2 routing]` line); queries `messages` for `sender_type='ai'` + `created_at > NOW() - INTERVAL '15 minutes'` for non-allowlisted phones; watches admin Messaging inbox for new conversations + AI replies for 30-60 minutes. Green light → schedule Phase C; anomaly → kill_switch per runbook.
+
+---
+
 ## Session #150 — Conversation lifecycle reactivation on new activity (Class (a) Item #1) (2026-06-13)
 
 Closes Class (a) Item #1 from the cumulative #146 + #149 audit backlog. Architecture in ADR-0007. Surfaced during #149's visual walkthrough — closed conversations receiving payment-link SMSes silently stayed Closed; the operator pre-empirical reproduction confirmed the gap (Mon Jun 8 conversation auto-close banner + two payment-link SMSes landing on June 8 + 9, conversation stuck Closed). Multi-system scope.
