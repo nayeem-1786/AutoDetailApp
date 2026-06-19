@@ -70,6 +70,7 @@ import {
   isStaffNotificationReason,
 } from '@/lib/services/staff-notification';
 import { approveAddon, declineAddon } from '@/lib/services/job-addons';
+import { formatErrorMessage, formatLogFields } from '@/lib/sms-ai/observability';
 
 export interface DispatchToolInput {
   name: string;
@@ -185,7 +186,13 @@ async function loadVoiceAgentApiKey(): Promise<string | null> {
       .maybeSingle();
     if (error || !data?.value) {
       _apiKeyLoadFailed = true;
-      console.warn('[SmsAiV2 dispatch] voice_agent_api_key not configured — HTTP-bound tools will fail');
+      console.warn(
+        `[SmsAiV2 dispatch] ${formatLogFields({
+          event: 'key_load_error',
+          error_class: 'tool_key_missing',
+          reason: 'not_configured',
+        })}`,
+      );
       return null;
     }
     const raw = typeof data.value === 'string' ? data.value : String(data.value);
@@ -194,8 +201,12 @@ async function loadVoiceAgentApiKey(): Promise<string | null> {
   } catch (err) {
     _apiKeyLoadFailed = true;
     console.warn(
-      '[SmsAiV2 dispatch] voice_agent_api_key load threw — HTTP-bound tools will fail:',
-      err instanceof Error ? err.message : String(err),
+      `[SmsAiV2 dispatch] ${formatLogFields({
+        event: 'key_load_error',
+        error_class: 'tool_key_missing',
+        reason: 'load_threw',
+        message: formatErrorMessage(err),
+      })}`,
     );
     return null;
   }
@@ -507,7 +518,7 @@ async function callSendQuoteSms(input: Record<string, unknown>, key: string): Pr
   // detection. Informational only — does NOT gate dispatch. Captures
   // what the LLM thinks counts as "configuration finalized" per Critical
   // Rule 17 preconditions. Post-deploy, operator greps PM2 logs for
-  // `[SmsAiV2.send_quote_sms.auto_send_trigger]` to monitor:
+  // `[SmsAiV2 dispatch] event=auto_send_trigger` to monitor:
   //   1. How often auto-send fires per conversation
   //   2. Whether services/tiers/quantities are threaded correctly
   //   3. False-fire candidates (audit Pattern 1/3/4/6/7 misclassifications)
@@ -517,16 +528,19 @@ async function callSendQuoteSms(input: Record<string, unknown>, key: string): Pr
   // sufficient for post-deploy false-fire monitoring; cross-reference
   // against the persisted message history via conversationId for full
   // context.
-  console.log(`[SmsAiV2.send_quote_sms.auto_send_trigger]`, {
-    conversationId: _runtimeContext.conversationId,
-    servicesCount: typeof input.services === 'string'
-      ? input.services.split(',').filter((s) => s.trim().length > 0).length
-      : 0,
-    services: typeof input.services === 'string' ? input.services : null,
-    tiers: typeof input.tiers === 'string' ? input.tiers : null,
-    quantities: typeof input.quantities === 'string' ? input.quantities : null,
-    sizeClass: _runtimeContext.size_class ?? null,
-  });
+  console.log(
+    `[SmsAiV2 dispatch] ${formatLogFields({
+      event: 'auto_send_trigger',
+      conv: _runtimeContext.conversationId,
+      services_count: typeof input.services === 'string'
+        ? input.services.split(',').filter((s) => s.trim().length > 0).length
+        : 0,
+      services: typeof input.services === 'string' ? input.services : null,
+      tiers: typeof input.tiers === 'string' ? input.tiers : null,
+      quantities: typeof input.quantities === 'string' ? input.quantities : null,
+      size_class: _runtimeContext.size_class ?? null,
+    })}`,
+  );
   // Issue 46 refinement (2026-05-26): tag the request with the originating
   // agent path so the route can branch `notificationType` between
   // `sms_agent_quote_sent` (this dispatcher) and `voice_quote_sent` (the
@@ -731,21 +745,36 @@ export async function dispatchTool(
   if (name === 'notify_staff') {
     const r = await callNotifyStaff(input.input);
     console.log(
-      `[SmsAiV2 dispatch] tool=${name} latency=${Date.now() - t0}ms error=${r.isError}`,
+      `[SmsAiV2 dispatch] ${formatLogFields({
+        event: 'tool',
+        tool: name,
+        latency_ms: Date.now() - t0,
+        error: r.isError,
+      })}`,
     );
     return r;
   }
   if (name === 'approve_addon') {
     const r = await callAddonAction('approve', input.input);
     console.log(
-      `[SmsAiV2 dispatch] tool=${name} latency=${Date.now() - t0}ms error=${r.isError}`,
+      `[SmsAiV2 dispatch] ${formatLogFields({
+        event: 'tool',
+        tool: name,
+        latency_ms: Date.now() - t0,
+        error: r.isError,
+      })}`,
     );
     return r;
   }
   if (name === 'decline_addon') {
     const r = await callAddonAction('decline', input.input);
     console.log(
-      `[SmsAiV2 dispatch] tool=${name} latency=${Date.now() - t0}ms error=${r.isError}`,
+      `[SmsAiV2 dispatch] ${formatLogFields({
+        event: 'tool',
+        tool: name,
+        latency_ms: Date.now() - t0,
+        error: r.isError,
+      })}`,
     );
     return r;
   }
@@ -754,7 +783,14 @@ export async function dispatchTool(
   if (!key) {
     const r = errResult('Tool call failed: voice_agent_api_key not configured');
     console.log(
-      `[SmsAiV2 dispatch] tool=${name} latency=${Date.now() - t0}ms error=true key=missing`,
+      `[SmsAiV2 dispatch] ${formatLogFields({
+        event: 'tool',
+        tool: name,
+        latency_ms: Date.now() - t0,
+        error: true,
+        error_class: 'tool_key_missing',
+        reason: 'key_missing',
+      })}`,
     );
     return r;
   }
@@ -806,7 +842,12 @@ export async function dispatchTool(
   }
 
   console.log(
-    `[SmsAiV2 dispatch] tool=${name} latency=${Date.now() - t0}ms error=${result.isError}`,
+    `[SmsAiV2 dispatch] ${formatLogFields({
+      event: 'tool',
+      tool: name,
+      latency_ms: Date.now() - t0,
+      error: result.isError,
+    })}`,
   );
   return result;
 }

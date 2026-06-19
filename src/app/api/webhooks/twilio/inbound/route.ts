@@ -24,6 +24,7 @@ import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { loadSmsAiV2Flags, shouldUseSmsAiV2 } from '@/lib/sms-ai/feature-flag';
 import { runV2AgentInBackground } from '@/lib/sms-ai/background-dispatch';
+import { formatErrorMessage, formatLogFields } from '@/lib/sms-ai/observability';
 import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
 import crypto from 'crypto';
 
@@ -414,18 +415,39 @@ export async function POST(request: NextRequest) {
               conversationId: conversation.id,
               phone: normalizedPhone,
             }).catch((err) => {
-              const msg = err instanceof Error ? err.message : String(err);
-              console.error(`[SmsAiV2 background] dispatch caught: ${msg}`);
+              // Defense-in-depth net for promise-rejection paths the
+              // internal try/catch in background-dispatch didn't see.
+              // background-dispatch emits its own canonical conversation_close
+              // line with error_class=dispatch_thrown for the cases it catches.
+              console.error(
+                `[SmsAiV2] ${formatLogFields({
+                  event: 'dispatch_thrown',
+                  error_class: 'dispatch_thrown',
+                  conv: conversation.id,
+                  phone: normalizedPhone,
+                  message: formatErrorMessage(err),
+                })}`,
+              );
             });
             console.log(
-              `[SmsAiV2 routing] conv=${conversation.id} phone=${normalizedPhone} → v2`,
+              `[SmsAiV2] ${formatLogFields({
+                event: 'routing',
+                decision: 'v2',
+                conv: conversation.id,
+                phone: normalizedPhone,
+              })}`,
             );
             return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });
           }
         } catch (v2Err) {
-          const msg = v2Err instanceof Error ? v2Err.message : String(v2Err);
           console.error(
-            `[SmsAiV2 routing] flag/dispatch threw — dropping AI reply: ${msg}`,
+            `[SmsAiV2] ${formatLogFields({
+              event: 'routing_error',
+              error_class: 'flag_dispatch_threw',
+              conv: conversation.id,
+              phone: normalizedPhone,
+              message: formatErrorMessage(v2Err),
+            })}`,
           );
           // v1 legacy fallback was deleted in Phase C (Workstream A
           // Layer 5). On v2 flag-load / dispatch error, log + drop

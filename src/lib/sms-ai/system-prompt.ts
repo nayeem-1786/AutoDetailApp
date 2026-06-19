@@ -27,11 +27,18 @@
  *                            cached prefix stays customer-agnostic
  *                            (audit §4.5 prompt caching).
  *
- * Observability — every call emits a single log line so PM2 / operator tools
- * can tell which prompt source served each inbound:
+ * Observability — every call emits a single log line so PM2 / operator
+ * tools can tell which prompt source served each inbound:
  *
- *   [SmsAiV2 prompt] source=db bytes=<n>
- *   [SmsAiV2 prompt] source=fallback reason=<null|empty|error>
+ *   [SmsAiV2] event=prompt_loaded source=db bytes=<n>
+ *   [SmsAiV2] event=prompt_loaded source=fallback reason=<null|empty|error>
+ *
+ * On a DB read throw, an additional warning line emits with the captured
+ * error message + error_class=prompt_load_error, then the fallback path
+ * continues (emit shape above with reason=error).
+ *
+ * Return shape is `{ text, source }` so the runner can roll `source` into
+ * its conversation_close line without re-deriving it.
  *
  * Rollback semantics (see docs/dev/SMS_AI_V2_ROLLBACK.md):
  *
@@ -46,6 +53,20 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { formatErrorMessage, formatLogFields } from './observability';
+
+/**
+ * `db` = `business_settings.messaging_ai_instructions` row was readable + non-empty.
+ * `fallback` = DB read errored / row missing / value null or empty — the
+ * canonical `getStandardTemplate()` from this file was used instead.
+ */
+export type PromptSource = 'db' | 'fallback';
+
+/** Shape returned by `buildV2SystemPrompt` — text plus its source discriminator. */
+export interface BuiltSystemPrompt {
+  text: string;
+  source: PromptSource;
+}
 
 export interface SystemPromptInputs {
   businessName: string;
@@ -815,9 +836,9 @@ function applyGroundingSubstitutions(
  */
 export async function buildV2SystemPrompt(
   inputs: SystemPromptInputs,
-): Promise<string> {
+): Promise<BuiltSystemPrompt> {
   let template = '';
-  let source: 'db' | 'fallback' = 'fallback';
+  let source: PromptSource = 'fallback';
   let fallbackReason: 'null' | 'empty' | 'error' | null = null;
 
   try {
@@ -847,15 +868,37 @@ export async function buildV2SystemPrompt(
     }
   } catch (err) {
     fallbackReason = 'error';
-    console.warn('[SmsAiV2 prompt] DB read threw:', err);
+    console.warn(
+      `[SmsAiV2] ${formatLogFields({
+        event: 'prompt_load_error',
+        error_class: 'prompt_load_error',
+        reason: 'db_read_threw',
+        message: formatErrorMessage(err),
+      })}`,
+    );
   }
 
   if (source === 'fallback') {
     template = getStandardTemplate();
-    console.log(`[SmsAiV2 prompt] source=fallback reason=${fallbackReason}`);
+    console.log(
+      `[SmsAiV2] ${formatLogFields({
+        event: 'prompt_loaded',
+        source: 'fallback',
+        reason: fallbackReason,
+      })}`,
+    );
   } else {
-    console.log(`[SmsAiV2 prompt] source=db bytes=${template.length}`);
+    console.log(
+      `[SmsAiV2] ${formatLogFields({
+        event: 'prompt_loaded',
+        source: 'db',
+        bytes: template.length,
+      })}`,
+    );
   }
 
-  return applyGroundingSubstitutions(template, inputs);
+  return {
+    text: applyGroundingSubstitutions(template, inputs),
+    source,
+  };
 }

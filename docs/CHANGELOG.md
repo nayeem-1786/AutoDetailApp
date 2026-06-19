@@ -6,6 +6,76 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Workstream A — SMS AI v2 Layer 6 Tier 1 observability (2026-06-19, Session #154)
+
+**Goal:** bring v2's stdout observability up to the "structure + persistence + consumability" bar that the lifecycle-engine cron sets, without committing to Tier 2 audit_log persistence yet. Pure-stdout work — no schema changes, no migrations, no admin UI, no behavior changes to v2 routing/agent loop/tool execution/prompt loading/any decision logic.
+
+**Tier 1 scope (LOCKED via 4-question AskUserQuestion flow):**
+
+- **Q1 — Scope tier:** Tier 1 (minimal). Tier 2 (audit_log) and Tier 3 (admin UI + metrics backend) explicitly deferred to future sessions with their own pre-flight audits.
+- **Q2 — audit_log writes:** Deferred to Tier 2. All Layer 6 emissions stay in stdout / PM2.
+- **Q3 — Log format:** Stable `key=value` normalized (not JSON-line, not hybrid).
+- **Q4 — Prefix vocabulary:** 3 prefixes consolidating the pre-Layer-6 7 — `[SmsAiV2]` (general: routing, prompt, flag, lifecycle, transport errors) / `[SmsAiV2 runner]` (agent-loop per-iter) / `[SmsAiV2 dispatch]` (per-tool dispatch + auto_send_trigger).
+
+**Gaps closed (5 of 10 from G1-G10 audit):**
+
+- **G1 — End-to-end latency.** `runV2AgentInBackground` captures `startedAt = Date.now()` at entry; emits `total_ms=N` on the conversation_close line. Sub-millisecond gap vs webhook-entry timestamp accepted (no plumbing through `RunAgentInput` for Tier 1).
+- **G5 — Reply-outcome consolidation.** The 4 `runner done ...` lines were retired. `background-dispatch` now emits ONE canonical `[SmsAiV2] event=conversation_close conv=X total_ms=N iters=N stop=Y tool_calls=N chunks=N reply_sent=true|false prompt_source=db|fallback cache_reads=N cache_creates=N [error_class=<enum>]` line per inbound. Hard cap: 11 fields (PM2-tail readability ceiling).
+- **G6 — Error taxonomy.** New 9-value `SmsAiV2ErrorClass` enum (`api_error` / `max_iterations` / `unknown_stop` / `no_reply` / `flag_load_error` / `flag_dispatch_threw` / `dispatch_thrown` / `tool_key_missing` / `prompt_load_error`) with `isV2ErrorClass` type guard. Every error-path emission carries `error_class=<enum>`; success paths omit the field. Operator can `grep error_class=<value>` to aggregate by category.
+- **G7 — Cache visibility.** Runner now destructures `usage.cache_read_input_tokens` + `usage.cache_creation_input_tokens` from every `client.messages.create` response. Per-iter emissions add `cache_reads=N cache_creates=N`; runner accumulates totals into `RunAgentResult.cacheStats`; conversation_close emits the rollup. Operationally critical: verifies Phase C's DB-first prompt is actually getting cached vs paying full creation cost on every inbound.
+- **G8 — Prefix vocabulary.** Pre-Layer-6 had 7 prefixes (`[SmsAiV2 routing]`, `[SmsAiV2 background]`, `[SmsAiV2 runner]`, `[SmsAiV2 dispatch]`, `[SmsAiV2 prompt]`, `[SmsAiV2 flag]`, dot-delimited outlier `[SmsAiV2.send_quote_sms.auto_send_trigger]`). Consolidated to 3 per Q4 lock. Dot-delimited outlier retired; auto-send trigger now emits as `[SmsAiV2 dispatch] event=auto_send_trigger ...`.
+
+**Gaps explicitly deferred (5 of 10 — separate session scope):**
+
+- **G2** (structured taxonomy beyond enum) — partially addressed by `event=` discriminator; full structured stop-reason vocabulary requires more design surface
+- **G3** (audit_log persistence) — Tier 2 (per Q1 lock)
+- **G4** (per-tool failure-rate rollup) — Tier 2 (per Q1 lock)
+- **G9** (admin UI history viewer) — Tier 3 (per Q1 lock)
+- **G10** (metric counter backend) — Tier 3 (per Q1 lock)
+
+**What shipped (9-step locked implementation order):**
+
+1. **`src/lib/sms-ai/observability.ts` NEW (~110 LoC).** Single source of truth for: `SmsAiV2ErrorClass` enum + `isV2ErrorClass` type guard (refinement to operator's spec — prevents future type-coercion drift in tests + narrowed code paths); `CacheStats` interface + `emptyCacheStats` factory; `formatLogFields` shared `key=value` formatter (handles string/number/boolean/null/undefined; quotes strings containing whitespace, `=`, or `"`; skips null+undefined fields — primary mechanism for the optional `error_class` field); `formatErrorMessage` defensive `unknown → string` normalizer for catch sites. Full JSDoc header explains the prefix consolidation + the Tier 2 plan.
+
+2. **`src/lib/sms-ai/agent-runner.ts` MOD.** Imports observability helpers + `PromptSource` type. `RunAgentResult` interface gains `cacheStats: CacheStats` + `promptSource: PromptSource` + optional `errorClass?: SmsAiV2ErrorClass`. Body: destructures `{ text, source }` from `buildV2SystemPrompt` (now returns shape); allocates `cacheStats` accumulator at top; sums `response.usage.cache_*_input_tokens` after every Anthropic call (main loop + Issue-35 retry + forced-final); replaces per-iter + dispatch + retry + forced-final + api-error log lines with `formatLogFields` calls; retires the 4 `done` lines (background-dispatch owns conversation_close now); sets `errorClass` on api_error/max_iterations/unknown_stop/no_reply paths.
+
+3. **`src/lib/sms-ai/background-dispatch.ts` MOD.** Imports observability helpers + `SmsAiV2ErrorClass`. `LOG_PREFIX` consolidated to `[SmsAiV2]`. `runV2AgentInBackground` captures `startedAt` at entry. Success + no-reply paths merged into ONE `conversation_close` emission with 10 fields (11 on error paths). `sendAndLogChunks` returns `{ anySuccess }` so the close line gets accurate `reply_sent=true|false`. Dispatch-throw catch emits TWO lines (`dispatch_thrown` with error message + `conversation_close`) to keep close at the 11-field cap. All 6 transport-error emissions (`message_insert_error`, `chunk_send_error`, `conversation_update_error` ×2, `business_info_load_error`, `business_hours_load_error`) consolidated under `[SmsAiV2]` with `event=` discriminator.
+
+4. **`src/lib/sms-ai/tool-dispatcher.ts` MOD.** Imports observability helpers. Dot-delimited outlier `[SmsAiV2.send_quote_sms.auto_send_trigger]` consolidated to `[SmsAiV2 dispatch] event=auto_send_trigger ...`. 5 per-tool dispatch summary lines normalized to `latency=Xms` → `latency_ms=X` via `formatLogFields`. Key-load error path emits `error_class=tool_key_missing`.
+
+5. **`src/lib/sms-ai/system-prompt.ts` MOD.** `buildV2SystemPrompt` return type changed from `Promise<string>` to `Promise<BuiltSystemPrompt>` where `BuiltSystemPrompt = { text: string, source: PromptSource }`. The 3 log emissions consolidated to `[SmsAiV2] event=prompt_loaded source=db bytes=N` / `event=prompt_loaded source=fallback reason=X` / `event=prompt_load_error error_class=prompt_load_error reason=db_read_threw message=Y`. Header docstring (lines 30-46) updated with the new log shapes + `BuiltSystemPrompt` rationale (runner needs `source` for conversation_close without re-deriving).
+
+6. **`src/lib/sms-ai/feature-flag.ts` MOD.** Imports observability helpers. Both load-error sites consolidated to `[SmsAiV2] event=flag_load_error error_class=flag_load_error reason=load_failed|load_threw message=X defaulting=disabled`. Success path emits no log line — conversation_close already provides the per-inbound positive signal; an additional heartbeat was scoped out (drafted in implementation, dropped during pre-commit review for log-volume conservation).
+
+7. **`src/app/api/webhooks/twilio/inbound/route.ts` MOD.** Imports observability helpers. Routing-decision log → `[SmsAiV2] event=routing decision=v2 conv=X phone=Y`. Webhook-side `v2Err` catch → `[SmsAiV2] event=routing_error error_class=flag_dispatch_threw conv=X phone=Y message=Z`. Outer fire-and-forget `.catch` → `[SmsAiV2] event=dispatch_thrown error_class=dispatch_thrown conv=X phone=Y message=Z` (defense-in-depth net for promise-rejection paths the internal try/catch in background-dispatch didn't see).
+
+8. **Tests.** `system-prompt.test.ts` — 184 const-assignments destructured (`const out = await buildV2SystemPrompt(X)` → `const { text: out } = await buildV2SystemPrompt(X)`) via single-regex sed (no other functional touches). `agent-runner.test.ts` — 1 noReply-retry assertion updated to match new `event=no_reply_retry` / `event=no_reply_retry_result` shapes (legacy `noReply detected` / `noReply_retried=true` references retired). `background-dispatch.test.ts` — 3 transport-error assertions updated to new `event=message_insert_error` / `event=conversation_update_error` shapes; dispatch-throw assertion updated to `event=dispatch_thrown` + `error_class=dispatch_thrown`. **NEW regression suite** (`conversation_close line shape (Layer 6 / Session #154)` — 5 tests): pins success line shape (10 fields, error_class absent), api_error line (error_class=api_error, chunks=0, reply_sent=false), prompt_source=fallback, reply_sent=false on all-chunks-failed (defensive transport-failure case), dispatch_thrown TWO-line emission (matches the 11-field cap split). `sms-ai-v2-routing.test.ts` — 1 dispatch-rejection assertion updated to new shape. `endTurnResult`/`apiErrorResult`/`maxIterationsResult`/`unknownStopResult` helpers updated to include `cacheStats` + `promptSource` + `errorClass` (now required on `RunAgentResult`); optional `RunAgentResultOverrides` parameter lets new tests inject realistic values.
+
+9. **Doc updates.** `SMS_AI_V2_ROLLBACK.md` line 29 — PM2-grep example updated from `[SmsAiV2 routing] ... → v2` to `[SmsAiV2] event=routing decision=v2` (operationally critical: the runbook is the post-deploy verification path; broken grep examples = broken runbook). `FILE_TREE.md` — background-dispatch description updated with the new conversation_close line shape + 11-field cap + dispatch_thrown two-line split; NEW observability.ts entry. `SMS_AI_V2_PROMPT_OBSERVATIONS.md` — historical-traces section gets a 1-paragraph note explaining Layer 6's prefix change; pre-Layer-6 traces preserved as-is for evidence continuity.
+
+**Audit-isolation check (pre-implementation):** CC-side grep of `scripts/`, `docs/`, all config files (`*.json` / `*.yml` / `*.yaml` / `*.conf` / `*.toml`), and `src/` outside known surfaces — zero non-documentation consumers of any of the 7 pre-Layer-6 log prefixes. Operator-side VPS check of `/var/log/` and `/etc/` — also zero (no log shippers like Datadog/Logtail/fluent-bit/vector installed; cPanel/CloudLinux crons don't parse PM2 logs; agent360 system-monitoring agent doesn't touch application logs). Safe to rename without breaking any external consumer.
+
+**Audit-isolation finding nuance:** doc references in `SMS_AI_V2_PROMPT_OBSERVATIONS.md` (13 lines of historical traces + 1 doc note) + `FILE_TREE.md` (1 prefix reference) + `SMS_AI_V2_ROLLBACK.md` (1 runbook example) all touched in Step 9. Symbol references in `STRIPE_WEBHOOK_PAYMENT_LINK_AUDIT.md` and `SMS_AI_V2_LAYER_3_DISCOVERY.md` (function/type names like `runSmsAiV2Agent`, `loadSmsAiV2Flags`) UNCHANGED — Layer 6 did not rename any symbols, only log prefixes.
+
+**Hard rules respected:** NO new dependencies. NO schema changes. NO migrations. NO admin UI changes. NO behavior changes to v2 routing decision logic, agent-loop tool-call semantics, prompt-loading fallback ladder (already DB-first per Phase C), or any control-flow decision. All emissions are stdout-format / observability-only.
+
+**Gates:** tsc 3 baseline errors preserved (`customer-accept-service.test.ts:44,49,73` TS2556 pre-existing, untouched per Memory #29 Targeted-discipline; the 2 sla-cron errors cleared yesterday in #153). Lint 0 new on changed files (baseline 98 warnings preserved across the repo). Vitest **3470 passed / 66 skipped (was 3465 baseline; +5 = 5 new conversation_close shape regression tests)**. Build clean.
+
+**Post-deploy verification (operator runs after `time deploy-smartdetails`):**
+
+```
+ssh root@31.220.60.157 'pm2 logs smart-details --lines 200 --nostream 2>&1 | grep -E "\[SmsAiV2\]|\[SmsAiV2 runner\]|\[SmsAiV2 dispatch\]" | tail -40'
+```
+
+Expected post-deploy patterns:
+- Successful inbound: `event=flag_loaded`, `event=prompt_loaded source=db|fallback bytes=N`, `event=routing decision=v2`, N × `event=iter ... cache_reads=N cache_creates=N`, M × `event=tool tool=X latency_ms=N error=bool`, `event=conversation_close ... reply_sent=true prompt_source=X cache_reads=N cache_creates=N`
+- Failed inbound: same shape + `error_class=<enum>` on the close line
+- Cache verification: `cache_reads=N` field on `event=iter` lines should be > 0 on iter 2+ within the same conversation if Phase C's DB-first prompt is producing a stable cache key. If `cache_creates=N` is non-zero on every iter, Phase C's DB read is introducing variance — investigate prompt drift.
+
+**Forward-facing v1/v2 audit:** ZERO operator-/customer-facing v2 references. The 3-prefix scheme stays `[SmsAiV2]` developer-facing (PM2 logs, dev runbooks); customer SMS bodies, admin UI labels, and operator-visible toasts contain ZERO v1/v2 string references (same as Phase A/C — re-verified this session).
+
+---
+
 ## Fix: lifecycle-engine Phase 4 SLA cron PGRST201 disambiguation (2026-06-18, Session #153)
 
 **Production cron had been silently failing on every business-hours run.** The `/api/cron/lifecycle-engine` Phase 4 SLA scan (`AC-12` pending-appointment alerts) was throwing `PGRST201: Could not embed because more than one relationship was found for 'appointments' and 'quotes'` on every execution. Pending-accept appointments past `AC12_SLA_THRESHOLD_MINUTES` (60min) were going un-alerted to staff for the full window since the dual-FK regime landed on 2026-06-07 (`20260607202559_appointments_ac12_schema_additions.sql` added `appointments.quote_id` as a forward back-link alongside the existing `quotes.converted_appointment_id` reverse link).

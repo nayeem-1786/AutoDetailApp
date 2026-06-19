@@ -26,7 +26,7 @@ WHERE key = 'sms_ai_v2_kill_switch';
 
 Expected: `true`.
 
-Then send a test SMS from a non-allowlisted phone. Post-Phase-C, the expected behavior is **no AI reply** — verify the customer's inbound was stored (admin Messaging inbox shows the new conversation) and that no `messages` row with `sender_type='ai'` was inserted in the past few minutes for that conversation. PM2 logs should show the `[SmsAiV2 routing]` line did NOT log "→ v2" (kill_switch short-circuited the routing decision).
+Then send a test SMS from a non-allowlisted phone. Post-Phase-C, the expected behavior is **no AI reply** — verify the customer's inbound was stored (admin Messaging inbox shows the new conversation) and that no `messages` row with `sender_type='ai'` was inserted in the past few minutes for that conversation. PM2 logs should show that `[SmsAiV2] event=routing decision=v2` did NOT emit (kill_switch short-circuited the routing decision before the v2 dispatch fire). Layer 6 (Session #154) — pre-Layer-6 this line was `[SmsAiV2 routing] conv=... phone=... → v2`; same semantics, new structured shape. Grep target for verification: `grep -E '\[SmsAiV2\] event=routing'` on the PM2 tail.
 
 ## Re-enable v2 after fix
 

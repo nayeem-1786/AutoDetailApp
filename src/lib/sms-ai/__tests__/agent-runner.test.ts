@@ -894,9 +894,14 @@ describe('runSmsAiV2Agent — Issue 35 noReply backstop retry', () => {
     await runSmsAiV2Agent(BASE_INPUT);
 
     const messages = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
-    expect(messages).toMatch(/noReply detected conv=conv-123 iterations=2 retrying with nudge/);
-    expect(messages).toMatch(/noReply retry conv=conv-123 stop=end_turn chunks=1/);
-    expect(messages).toMatch(/noReply_retried=true/);
+    // Layer 6 (Session #154) — log shapes consolidated. Free-form
+    // "noReply detected... retrying with nudge" and
+    // "noReply retry conv=... stop=..." → structured event lines.
+    // The legacy "done" line (and `noReply_retried=true` flag) was retired:
+    // the canonical conversation_close line is emitted by
+    // background-dispatch instead, not by the runner.
+    expect(messages).toMatch(/event=no_reply_retry conv=conv-123 iter=2/);
+    expect(messages).toMatch(/event=no_reply_retry_result conv=conv-123 stop=end_turn chunks=1/);
     logSpy.mockRestore();
   });
 });

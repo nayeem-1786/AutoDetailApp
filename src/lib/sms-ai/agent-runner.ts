@@ -47,12 +47,20 @@ import {
 import {
   CUSTOMER_CONTEXT_PLACEHOLDER,
   buildV2SystemPrompt,
+  type PromptSource,
 } from '@/lib/sms-ai/system-prompt';
 import { SMS_AI_V2_TOOLS } from '@/lib/sms-ai/tools';
 import {
   dispatchTool,
   __resetForAgentRun as resetDispatcherForAgentRun,
 } from '@/lib/sms-ai/tool-dispatcher';
+import {
+  type CacheStats,
+  type SmsAiV2ErrorClass,
+  emptyCacheStats,
+  formatErrorMessage,
+  formatLogFields,
+} from '@/lib/sms-ai/observability';
 
 import {
   getCustomerContext,
@@ -114,7 +122,13 @@ export interface RunAgentResult {
   iterations: number;
   stopReason: RunAgentStopReason;
   toolCalls: ToolCallRecord[];
+  /** Sum of usage.cache_*_input_tokens across all messages.create calls in this run. */
+  cacheStats: CacheStats;
+  /** Which source served the system prompt — `db` (operator-edited) or `fallback` (hardcoded). */
+  promptSource: PromptSource;
   errorMessage?: string;
+  /** Error taxonomy. Present on api_error / max_iterations / unknown_stop / no_reply; absent on plain end_turn success. */
+  errorClass?: SmsAiV2ErrorClass;
 }
 
 /**
@@ -273,7 +287,16 @@ export async function runSmsAiV2Agent(
 
   // 1. Build cached system body. Substitution happens BEFORE the cache_control
   //    block is attached so the substituted text becomes the cache key.
-  const promptShell = await buildV2SystemPrompt({ businessName, businessHours, currentDate });
+  //    `source` is threaded through to `RunAgentResult.promptSource`.
+  const { text: promptShell, source: promptSource } = await buildV2SystemPrompt({
+    businessName,
+    businessHours,
+    currentDate,
+  });
+
+  // Cache-token accumulator — summed across main loop + Issue-35 retry +
+  // forced-final so the conversation_close line gets one rollup pair.
+  const cacheStats: CacheStats = emptyCacheStats();
 
   const ctx = await getCustomerContext({
     phone,
@@ -335,10 +358,24 @@ export async function runSmsAiV2Agent(
       });
       const latency = Date.now() - callStart;
 
+      const iterCacheReads = response.usage.cache_read_input_tokens ?? 0;
+      const iterCacheCreates = response.usage.cache_creation_input_tokens ?? 0;
+      cacheStats.reads += iterCacheReads;
+      cacheStats.creates += iterCacheCreates;
+
       const toolUseBlocks = response.content.filter(isToolUseBlock);
 
       console.log(
-        `[SmsAiV2 runner] iter=${iter} conv=${conversationId} stop=${response.stop_reason} tool_calls=${toolUseBlocks.length} latency=${latency}ms`,
+        `[SmsAiV2 runner] ${formatLogFields({
+          event: 'iter',
+          iter,
+          conv: conversationId,
+          stop: response.stop_reason,
+          tool_calls: toolUseBlocks.length,
+          latency_ms: latency,
+          cache_reads: iterCacheReads,
+          cache_creates: iterCacheCreates,
+        })}`,
       );
 
       if (response.stop_reason === 'end_turn') {
@@ -352,7 +389,11 @@ export async function runSmsAiV2Agent(
         // model ignores the directive. Single retry only — never loops.
         if (finalText.trim().length === 0 && iter > 1) {
           console.log(
-            `[SmsAiV2 runner] noReply detected conv=${conversationId} iterations=${iter} retrying with nudge`,
+            `[SmsAiV2 runner] ${formatLogFields({
+              event: 'no_reply_retry',
+              conv: conversationId,
+              iter,
+            })}`,
           );
 
           // Push the model's (empty) end_turn turn to maintain the
@@ -372,44 +413,66 @@ export async function runSmsAiV2Agent(
           const retryLatency = Date.now() - retryStart;
           const retryText = extractText(retryResponse.content);
 
+          const retryCacheReads = retryResponse.usage.cache_read_input_tokens ?? 0;
+          const retryCacheCreates = retryResponse.usage.cache_creation_input_tokens ?? 0;
+          cacheStats.reads += retryCacheReads;
+          cacheStats.creates += retryCacheCreates;
+
           console.log(
-            `[SmsAiV2 runner] noReply retry conv=${conversationId} stop=${retryResponse.stop_reason} chunks=${retryText.trim().length > 0 ? 1 : 0} latency=${retryLatency}ms`,
-          );
-          console.log(
-            `[SmsAiV2 runner] done conv=${conversationId} iterations=${iter} stop=end_turn tool_calls_total=${toolCalls.length} noReply_retried=true`,
+            `[SmsAiV2 runner] ${formatLogFields({
+              event: 'no_reply_retry_result',
+              conv: conversationId,
+              stop: retryResponse.stop_reason,
+              chunks: retryText.trim().length > 0 ? 1 : 0,
+              latency_ms: retryLatency,
+              cache_reads: retryCacheReads,
+              cache_creates: retryCacheCreates,
+            })}`,
           );
 
+          // If retry produced text, use it. If retry STILL produced
+          // empty, fall back to the original (empty) finalText and tag
+          // the run with error_class=no_reply so the conversation_close
+          // line (emitted by background-dispatch) surfaces the failure.
+          const finalAssistantText = retryText.length > 0 ? retryText : finalText;
+          const errorClass: SmsAiV2ErrorClass | undefined =
+            finalAssistantText.trim().length === 0 ? 'no_reply' : undefined;
           return {
-            // If retry produced text, use it. If retry STILL produced
-            // empty, fall back to the original (empty) finalText —
-            // the dispatcher's noReply=true log path handles it.
-            assistantText: retryText.length > 0 ? retryText : finalText,
+            assistantText: finalAssistantText,
             iterations: iter,
             stopReason: 'end_turn',
             toolCalls,
+            cacheStats,
+            promptSource,
+            errorClass,
           };
         }
 
-        console.log(
-          `[SmsAiV2 runner] done conv=${conversationId} iterations=${iter} stop=end_turn tool_calls_total=${toolCalls.length}`,
-        );
+        // Plain end_turn (text present, or iter===1 so no retry triggered).
+        // If text is empty at iter===1 we still flag error_class=no_reply —
+        // the Issue-35 retry only fires for iter>1 (post-tool-dispatch).
+        const errorClass: SmsAiV2ErrorClass | undefined =
+          finalText.trim().length === 0 ? 'no_reply' : undefined;
         return {
           assistantText: finalText,
           iterations: iter,
           stopReason: 'end_turn',
           toolCalls,
+          cacheStats,
+          promptSource,
+          errorClass,
         };
       }
 
       if (response.stop_reason !== 'tool_use') {
-        console.log(
-          `[SmsAiV2 runner] done conv=${conversationId} iterations=${iter} stop=unknown(${response.stop_reason}) tool_calls_total=${toolCalls.length}`,
-        );
         return {
           assistantText: null,
           iterations: iter,
           stopReason: 'unknown',
           toolCalls,
+          cacheStats,
+          promptSource,
+          errorClass: 'unknown_stop',
         };
       }
 
@@ -467,7 +530,14 @@ export async function runSmsAiV2Agent(
       }
 
       console.log(
-        `[SmsAiV2 runner] iter=${iter} conv=${conversationId} dispatched=${toolUseBlocks.length} parallel_latency=${parallelLatency}ms errors=${toolResultBlocks.filter((b) => b.is_error).length}`,
+        `[SmsAiV2 runner] ${formatLogFields({
+          event: 'dispatch',
+          iter,
+          conv: conversationId,
+          dispatched: toolUseBlocks.length,
+          parallel_latency_ms: parallelLatency,
+          errors: toolResultBlocks.filter((b) => b.is_error).length,
+        })}`,
       );
 
       messages.push({ role: 'user', content: toolResultBlocks });
@@ -487,35 +557,57 @@ export async function runSmsAiV2Agent(
     });
     const forcedLatency = Date.now() - forcedStart;
     const forcedText = extractText(forced.content);
+
+    const forcedCacheReads = forced.usage.cache_read_input_tokens ?? 0;
+    const forcedCacheCreates = forced.usage.cache_creation_input_tokens ?? 0;
+    cacheStats.reads += forcedCacheReads;
+    cacheStats.creates += forcedCacheCreates;
+
     console.log(
-      `[SmsAiV2 runner] iter=${iter}+final conv=${conversationId} stop=${forced.stop_reason} tool_calls=0 latency=${forcedLatency}ms`,
+      `[SmsAiV2 runner] ${formatLogFields({
+        event: 'forced_final',
+        iter,
+        conv: conversationId,
+        stop: forced.stop_reason,
+        latency_ms: forcedLatency,
+        cache_reads: forcedCacheReads,
+        cache_creates: forcedCacheCreates,
+      })}`,
     );
-    console.log(
-      `[SmsAiV2 runner] done conv=${conversationId} iterations=${iter} stop=max_iterations tool_calls_total=${toolCalls.length}`,
-    );
+
+    // error_class='max_iterations' is set even when forcedText is non-empty
+    // because hitting the cap is a yellow-flag signal worth aggregating
+    // (the agent didn't converge naturally). Operator can grep
+    // error_class=max_iterations to find conversations that exhausted budget.
     return {
       assistantText: forcedText,
       iterations: iter,
       stopReason: 'max_iterations',
       toolCalls,
+      cacheStats,
+      promptSource,
+      errorClass: 'max_iterations',
     };
   } catch (err) {
-    const message =
-      err instanceof APIError
-        ? err.message
-        : err instanceof Error
-        ? err.message
-        : String(err);
+    const message = err instanceof APIError ? err.message : formatErrorMessage(err);
     console.error(
-      `[SmsAiV2 runner] api error: ${message}`,
-      { conversationId, iteration: iter },
+      `[SmsAiV2 runner] ${formatLogFields({
+        event: 'api_error',
+        conv: conversationId,
+        iter,
+        error_class: 'api_error',
+        message,
+      })}`,
     );
     return {
       assistantText: null,
       iterations: iter,
       stopReason: 'api_error',
       toolCalls,
+      cacheStats,
+      promptSource,
       errorMessage: message,
+      errorClass: 'api_error',
     };
   }
 }

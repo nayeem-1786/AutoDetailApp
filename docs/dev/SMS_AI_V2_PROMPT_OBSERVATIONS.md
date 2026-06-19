@@ -1000,6 +1000,8 @@ update-only is structurally cleaner.
 
 Test 4 ran against commit `acef3613` (upsert_customer fully deployed). PM2 logs show upsert_customer was called 5 times in one conversation:
 
+> **Note (Layer 6 / Session #154, 2026-06-19):** the log lines below are HISTORICAL TRACES captured pre-Layer-6 and preserved as-is for evidence continuity. Post-Layer-6 the equivalent line shape is `[SmsAiV2 dispatch] event=tool tool=upsert_customer latency_ms=388 error=false` (structured `key=value` with explicit `event=tool` discriminator + `latency_ms` instead of `latency=Xms`). Future operator greps should target the new shape; these traces are not regenerated.
+
 ```
 [SmsAiV2 dispatch] tool=upsert_customer latency=388ms error=false
 [SmsAiV2 dispatch] tool=upsert_customer latency=273ms error=false

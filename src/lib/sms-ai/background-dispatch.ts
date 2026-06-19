@@ -10,7 +10,7 @@
  * Contract:
  *   - Caller MUST NOT `await` the returned promise — the Twilio handler
  *     has already responded. Errors are swallowed and logged with the
- *     `[SmsAiV2 background]` prefix.
+ *     `[SmsAiV2]` prefix and `event=dispatch_thrown` discriminator.
  *   - Outbound chunks are split via the shared `splitSmsMessage` helper
  *     from `@/lib/utils/sms` (same chunker the legacy auto-reply uses) so
  *     v2 output is shape-identical to legacy output.
@@ -38,8 +38,18 @@ import {
   formatBusinessHoursText,
 } from '@/lib/data/business-hours';
 import { runSmsAiV2Agent } from '@/lib/sms-ai/agent-runner';
+import {
+  type SmsAiV2ErrorClass,
+  formatErrorMessage,
+  formatLogFields,
+} from '@/lib/sms-ai/observability';
 
-const LOG_PREFIX = '[SmsAiV2 background]';
+// All emissions in this module use the `[SmsAiV2]` general prefix with an
+// `event=<name>` discriminator (`conversation_close`, `dispatch_thrown`,
+// `message_insert_error`, `chunk_send_error`, `conversation_update_error`,
+// `business_info_load_error`, `business_hours_load_error`). See
+// observability.ts for the full event vocabulary.
+const LOG_PREFIX = '[SmsAiV2]';
 
 export interface BackgroundDispatchInput {
   inboundMessageBody: string;
@@ -59,6 +69,11 @@ export async function runV2AgentInBackground(
   input: BackgroundDispatchInput,
 ): Promise<void> {
   const { inboundMessageBody, conversationId, phone } = input;
+
+  // Capture wall-clock start. The diff between webhook entry and this
+  // point is sub-millisecond, so this is the right anchor for
+  // end-to-end customer-perceived latency on the conversation_close line.
+  const startedAt = Date.now();
 
   try {
     const [businessInfo, hours] = await Promise.all([
@@ -83,31 +98,70 @@ export async function runV2AgentInBackground(
       currentDate,
     });
 
-    if (
+    let chunksSent = 0;
+    let replySent = false;
+    const hasReplyText =
       (result.stopReason === 'end_turn' ||
         result.stopReason === 'max_iterations') &&
-      result.assistantText &&
-      result.assistantText.trim().length > 0
-    ) {
-      const chunks = splitSmsMessage(result.assistantText);
-      await sendAndLogChunks(conversationId, phone, chunks);
-      console.log(
-        `${LOG_PREFIX} conv=${conversationId} stopReason=${result.stopReason} iterations=${result.iterations} toolCalls=${result.toolCalls.length} chunks=${chunks.length}`,
-      );
-      return;
+      result.assistantText !== null &&
+      result.assistantText.trim().length > 0;
+
+    if (hasReplyText) {
+      const chunks = splitSmsMessage(result.assistantText as string);
+      chunksSent = chunks.length;
+      const { anySuccess } = await sendAndLogChunks(conversationId, phone, chunks);
+      replySent = anySuccess;
     }
 
-    // No SMS sent — log and exit. api_error / unknown / empty text all land here.
+    // Canonical conversation_close line. 10 fields on success, 11 on error
+    // (optional error_class only present on outcomes from the error
+    // taxonomy enum). Hard cap is 11 — see observability.ts header.
     console.log(
-      `${LOG_PREFIX} conv=${conversationId} stopReason=${result.stopReason} iterations=${result.iterations} toolCalls=${result.toolCalls.length} chunks=0 noReply=true${
-        result.errorMessage ? ` errorMessage="${result.errorMessage}"` : ''
-      }`,
+      `${LOG_PREFIX} ${formatLogFields({
+        event: 'conversation_close',
+        conv: conversationId,
+        total_ms: Date.now() - startedAt,
+        iters: result.iterations,
+        stop: result.stopReason,
+        tool_calls: result.toolCalls.length,
+        chunks: chunksSent,
+        reply_sent: replySent,
+        prompt_source: result.promptSource,
+        cache_reads: result.cacheStats.reads,
+        cache_creates: result.cacheStats.creates,
+        error_class: result.errorClass,
+      })}`,
     );
   } catch (err) {
-    // The runner itself or one of the helpers threw. Log; do NOT propagate.
-    const msg = err instanceof Error ? err.message : String(err);
+    // The runner itself or one of the helpers threw. Emit TWO lines:
+    //   1. dispatch_thrown — carries the error message for diagnosis
+    //   2. conversation_close — uniform grep target across all outcomes
+    // Splitting these keeps conversation_close at the 11-field hard cap
+    // (see observability.ts header).
+    const errorClass: SmsAiV2ErrorClass = 'dispatch_thrown';
     console.error(
-      `${LOG_PREFIX} runner failed conv=${conversationId}: ${msg}`,
+      `${LOG_PREFIX} ${formatLogFields({
+        event: 'dispatch_thrown',
+        conv: conversationId,
+        error_class: errorClass,
+        message: formatErrorMessage(err),
+      })}`,
+    );
+    console.error(
+      `${LOG_PREFIX} ${formatLogFields({
+        event: 'conversation_close',
+        conv: conversationId,
+        total_ms: Date.now() - startedAt,
+        iters: 0,
+        stop: 'dispatch_thrown',
+        tool_calls: 0,
+        chunks: 0,
+        reply_sent: false,
+        prompt_source: 'fallback',
+        cache_reads: 0,
+        cache_creates: 0,
+        error_class: errorClass,
+      })}`,
     );
   }
 }
@@ -133,13 +187,18 @@ async function sendAndLogChunks(
   conversationId: string,
   phone: string,
   chunks: string[],
-): Promise<void> {
+): Promise<{ anySuccess: boolean }> {
   const admin = createAdminClient();
   let lastChunk = '';
+  // Track per-chunk send outcomes so the conversation_close line emits
+  // `reply_sent=<true|false>` accurately. "Reply sent" = at least one
+  // chunk reached Twilio. All-fail = customer got nothing → reply_sent=false.
+  let anySuccess = false;
 
   for (const chunk of chunks) {
     try {
       const smsResult = await sendSms(phone, chunk);
+      if (smsResult.success) anySuccess = true;
       const { error: insertError } = await admin.from('messages').insert({
         conversation_id: conversationId,
         direction: 'outbound',
@@ -151,17 +210,23 @@ async function sendAndLogChunks(
       });
       if (insertError) {
         console.error(
-          `${LOG_PREFIX} message INSERT failed conv=${conversationId} ` +
-            `code=${insertError.code ?? 'unknown'} ` +
-            `message=${insertError.message} ` +
-            `details=${insertError.details ?? 'n/a'}`,
+          `${LOG_PREFIX} ${formatLogFields({
+            event: 'message_insert_error',
+            conv: conversationId,
+            code: insertError.code ?? 'unknown',
+            message: insertError.message,
+            details: insertError.details ?? 'n/a',
+          })}`,
         );
       }
       lastChunk = chunk;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       console.error(
-        `${LOG_PREFIX} chunk send/log failed conv=${conversationId}: ${msg}`,
+        `${LOG_PREFIX} ${formatLogFields({
+          event: 'chunk_send_error',
+          conv: conversationId,
+          message: formatErrorMessage(err),
+        })}`,
       );
     }
   }
@@ -177,19 +242,27 @@ async function sendAndLogChunks(
         .eq('id', conversationId);
       if (updateError) {
         console.error(
-          `${LOG_PREFIX} conversation UPDATE failed conv=${conversationId} ` +
-            `code=${updateError.code ?? 'unknown'} ` +
-            `message=${updateError.message} ` +
-            `details=${updateError.details ?? 'n/a'}`,
+          `${LOG_PREFIX} ${formatLogFields({
+            event: 'conversation_update_error',
+            conv: conversationId,
+            code: updateError.code ?? 'unknown',
+            message: updateError.message,
+            details: updateError.details ?? 'n/a',
+          })}`,
         );
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       console.error(
-        `${LOG_PREFIX} conversation last-message update failed conv=${conversationId}: ${msg}`,
+        `${LOG_PREFIX} ${formatLogFields({
+          event: 'conversation_update_error',
+          conv: conversationId,
+          message: formatErrorMessage(err),
+        })}`,
       );
     }
   }
+
+  return { anySuccess };
 }
 
 async function safeGetBusinessInfo(): Promise<{ name: string }> {
@@ -197,8 +270,12 @@ async function safeGetBusinessInfo(): Promise<{ name: string }> {
     const info = await getBusinessInfo();
     return { name: info.name };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`${LOG_PREFIX} getBusinessInfo failed: ${msg}`);
+    console.warn(
+      `${LOG_PREFIX} ${formatLogFields({
+        event: 'business_info_load_error',
+        message: formatErrorMessage(err),
+      })}`,
+    );
     return { name: 'Smart Details Auto Spa' };
   }
 }
@@ -209,8 +286,12 @@ async function safeGetBusinessHours(): Promise<
   try {
     return await getBusinessHours();
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`${LOG_PREFIX} getBusinessHours failed: ${msg}`);
+    console.warn(
+      `${LOG_PREFIX} ${formatLogFields({
+        event: 'business_hours_load_error',
+        message: formatErrorMessage(err),
+      })}`,
+    );
     return null;
   }
 }

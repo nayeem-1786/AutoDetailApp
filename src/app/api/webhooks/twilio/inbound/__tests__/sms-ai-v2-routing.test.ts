@@ -396,7 +396,12 @@ describe('Twilio inbound webhook — v2 routing decision (post-Phase-C: v2 is th
     // Defer to allow the unhandled promise's .catch handler to fire
     await new Promise((r) => setTimeout(r, 10));
     const logged = errorSpy.mock.calls.map((c) => String(c[0])).join('\n');
-    expect(logged).toMatch(/SmsAiV2 background/);
+    // Layer 6 (Session #154) — `[SmsAiV2 background] dispatch caught: ...`
+    // consolidated to structured `[SmsAiV2] event=dispatch_thrown
+    // error_class=dispatch_thrown conv=... phone=... message=...`.
+    expect(logged).toMatch(/\[SmsAiV2\] event=dispatch_thrown/);
+    expect(logged).toMatch(/error_class=dispatch_thrown/);
+    expect(logged).toMatch(/runner exploded/);
     errorSpy.mockRestore();
   });
 });

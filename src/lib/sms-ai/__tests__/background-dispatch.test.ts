@@ -97,40 +97,67 @@ const BASE_INPUT = {
   phone: '+14245551234',
 };
 
-function endTurnResult(text: string | null) {
+// Layer 6 (Session #154) — helpers now include the required `cacheStats` +
+// `promptSource` fields the runner sets on every `RunAgentResult`. Each
+// helper takes optional overrides so tests can inject realistic cache /
+// source / error_class values when asserting on the conversation_close line.
+interface RunAgentResultOverrides {
+  cacheStats?: { reads: number; creates: number };
+  promptSource?: 'db' | 'fallback';
+  errorClass?:
+    | 'api_error'
+    | 'max_iterations'
+    | 'unknown_stop'
+    | 'no_reply'
+    | 'dispatch_thrown';
+}
+
+function endTurnResult(text: string | null, overrides: RunAgentResultOverrides = {}) {
   return {
     assistantText: text,
     iterations: 1,
     stopReason: 'end_turn' as const,
     toolCalls: [],
+    cacheStats: overrides.cacheStats ?? { reads: 0, creates: 0 },
+    promptSource: overrides.promptSource ?? ('db' as const),
+    errorClass: overrides.errorClass,
   };
 }
 
-function apiErrorResult(message = 'rate limited') {
+function apiErrorResult(message = 'rate limited', overrides: RunAgentResultOverrides = {}) {
   return {
     assistantText: null,
     iterations: 1,
     stopReason: 'api_error' as const,
     toolCalls: [],
     errorMessage: message,
+    cacheStats: overrides.cacheStats ?? { reads: 0, creates: 0 },
+    promptSource: overrides.promptSource ?? ('db' as const),
+    errorClass: 'api_error' as const,
   };
 }
 
-function maxIterationsResult(text: string | null) {
+function maxIterationsResult(text: string | null, overrides: RunAgentResultOverrides = {}) {
   return {
     assistantText: text,
     iterations: 6,
     stopReason: 'max_iterations' as const,
     toolCalls: [],
+    cacheStats: overrides.cacheStats ?? { reads: 0, creates: 0 },
+    promptSource: overrides.promptSource ?? ('db' as const),
+    errorClass: 'max_iterations' as const,
   };
 }
 
-function unknownStopResult() {
+function unknownStopResult(overrides: RunAgentResultOverrides = {}) {
   return {
     assistantText: null,
     iterations: 1,
     stopReason: 'unknown' as const,
     toolCalls: [],
+    cacheStats: overrides.cacheStats ?? { reads: 0, creates: 0 },
+    promptSource: overrides.promptSource ?? ('db' as const),
+    errorClass: 'unknown_stop' as const,
   };
 }
 
@@ -290,7 +317,11 @@ describe('runV2AgentInBackground — never throws', () => {
 
     expect(errorSpy).toHaveBeenCalled();
     const logged = errorSpy.mock.calls.map((c) => String(c[0])).join('\n');
-    expect(logged).toContain('[SmsAiV2 background]');
+    // Layer 6 (Session #154) — `[SmsAiV2 background]` prefix retired;
+    // dispatch_thrown now emits under `[SmsAiV2]` with structured event.
+    expect(logged).toContain('[SmsAiV2]');
+    expect(logged).toMatch(/event=dispatch_thrown/);
+    expect(logged).toMatch(/error_class=dispatch_thrown/);
     expect(logged).toContain('SDK exploded');
     errorSpy.mockRestore();
   });
@@ -369,10 +400,12 @@ describe('runV2AgentInBackground — PG INSERT errors are logged (not swallowed)
     expect(inserts.filter((r) => r.table === 'messages')).toHaveLength(1);
 
     const logged = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n');
-    expect(logged).toMatch(/\[SmsAiV2 background\] message INSERT failed/);
+    // Layer 6 (Session #154) — `[SmsAiV2 background] message INSERT failed`
+    // → `[SmsAiV2] event=message_insert_error ...` structured form.
+    expect(logged).toMatch(/\[SmsAiV2\] event=message_insert_error/);
     expect(logged).toMatch(/code=23514/);
     expect(logged).toMatch(/messages_channel_check/);
-    expect(logged).toMatch(/details=Failing row contains/);
+    expect(logged).toMatch(/details="?Failing row contains/);
     errorSpy.mockRestore();
   });
 
@@ -392,8 +425,8 @@ describe('runV2AgentInBackground — PG INSERT errors are logged (not swallowed)
     expect(inserts.filter((r) => r.table === 'messages')).toHaveLength(2);
 
     const logged = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n');
-    // Only the first chunk's INSERT failure is logged
-    const matches = logged.match(/message INSERT failed/g) ?? [];
+    // Layer 6 (Session #154) — match the new structured event verb.
+    const matches = logged.match(/event=message_insert_error/g) ?? [];
     expect(matches).toHaveLength(1);
     errorSpy.mockRestore();
   });
@@ -418,11 +451,149 @@ describe('runV2AgentInBackground — PG INSERT errors are logged (not swallowed)
     expect(updates.filter((r) => r.table === 'conversations')).toHaveLength(1);
 
     const logged = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n');
-    expect(logged).toMatch(
-      /\[SmsAiV2 background\] conversation UPDATE failed/,
-    );
+    // Layer 6 (Session #154) — `[SmsAiV2 background] conversation UPDATE failed`
+    // → `[SmsAiV2] event=conversation_update_error ...` structured form.
+    expect(logged).toMatch(/\[SmsAiV2\] event=conversation_update_error/);
     expect(logged).toMatch(/code=23505/);
     expect(logged).toMatch(/duplicate key value/);
+    errorSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression suite — conversation_close line shape (Layer 6 / Session #154).
+//
+// `[SmsAiV2] event=conversation_close ...` is the SINGLE canonical close
+// line for every v2 inbound. Pre-Layer-6, the runner emitted a "done" line
+// AND background-dispatch emitted a separate close line — operator had to
+// correlate two lines to answer "did v2 reply." Layer 6 consolidated to ONE.
+//
+// Hard cap: 11 fields (PM2-tail readability ceiling — see observability.ts
+// header). Test pins:
+//   1. Line emits on success paths
+//   2. Line emits on no-reply paths
+//   3. Line emits with error_class on error paths (e.g. api_error)
+//   4. cache_reads / cache_creates field names + values come from RunAgentResult.cacheStats
+//   5. prompt_source field comes from RunAgentResult.promptSource
+//   6. reply_sent is true when at least one chunk reaches Twilio
+//   7. reply_sent is false when sendSms fails on ALL chunks
+//   8. total_ms is a non-negative integer (wall-clock from runV2AgentInBackground entry)
+//   9. The dispatch_thrown branch emits TWO lines (split for 11-field cap)
+//
+// Each assertion is a `toMatch(/key=value/)` so a future field reordering
+// inside formatLogFields does NOT break the test (positional order is
+// stable per JS object-literal insertion order, but the test doesn't depend
+// on that).
+// ---------------------------------------------------------------------------
+
+describe('runV2AgentInBackground — conversation_close line shape (Layer 6 / Session #154)', () => {
+  it('emits one [SmsAiV2] event=conversation_close line on a successful end_turn reply', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    runSmsAiV2AgentMock.mockResolvedValueOnce(
+      endTurnResult('Sure — wax is $25!', {
+        cacheStats: { reads: 3200, creates: 0 },
+        promptSource: 'db',
+      }),
+    );
+
+    await runV2AgentInBackground(BASE_INPUT);
+
+    const lines = logSpy.mock.calls.map((c) => String(c[0]));
+    const close = lines.find((l) => l.includes('event=conversation_close'));
+    expect(close).toBeDefined();
+    // 10 fields on success (no error_class)
+    expect(close).toMatch(/\[SmsAiV2\] event=conversation_close/);
+    expect(close).toMatch(/conv=conv-1/);
+    expect(close).toMatch(/total_ms=\d+/);
+    expect(close).toMatch(/iters=1/);
+    expect(close).toMatch(/stop=end_turn/);
+    expect(close).toMatch(/tool_calls=0/);
+    expect(close).toMatch(/chunks=1/);
+    expect(close).toMatch(/reply_sent=true/);
+    expect(close).toMatch(/prompt_source=db/);
+    expect(close).toMatch(/cache_reads=3200/);
+    expect(close).toMatch(/cache_creates=0/);
+    // error_class field MUST be absent on success paths
+    expect(close).not.toMatch(/error_class=/);
+    logSpy.mockRestore();
+  });
+
+  it('emits conversation_close with error_class=api_error when runner returns api_error', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    runSmsAiV2AgentMock.mockResolvedValueOnce(
+      apiErrorResult('Anthropic 503', {
+        cacheStats: { reads: 0, creates: 5600 },
+        promptSource: 'db',
+      }),
+    );
+
+    await runV2AgentInBackground(BASE_INPUT);
+
+    const lines = logSpy.mock.calls.map((c) => String(c[0]));
+    const close = lines.find((l) => l.includes('event=conversation_close'));
+    expect(close).toBeDefined();
+    expect(close).toMatch(/stop=api_error/);
+    expect(close).toMatch(/chunks=0/);
+    expect(close).toMatch(/reply_sent=false/);
+    expect(close).toMatch(/error_class=api_error/);
+    expect(close).toMatch(/cache_creates=5600/);
+    logSpy.mockRestore();
+  });
+
+  it('emits conversation_close with prompt_source=fallback when runner used the hardcoded template', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    runSmsAiV2AgentMock.mockResolvedValueOnce(
+      endTurnResult('hello', { promptSource: 'fallback' }),
+    );
+
+    await runV2AgentInBackground(BASE_INPUT);
+
+    const lines = logSpy.mock.calls.map((c) => String(c[0]));
+    const close = lines.find((l) => l.includes('event=conversation_close'));
+    expect(close).toBeDefined();
+    expect(close).toMatch(/prompt_source=fallback/);
+    logSpy.mockRestore();
+  });
+
+  it('emits reply_sent=false when sendSms fails on EVERY chunk (defensive — runner returned text but transport dropped it)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    runSmsAiV2AgentMock.mockResolvedValueOnce(endTurnResult('hi'));
+    sendSmsMock.mockResolvedValueOnce({ success: false, error: 'Twilio down' });
+
+    await runV2AgentInBackground(BASE_INPUT);
+
+    const lines = logSpy.mock.calls.map((c) => String(c[0]));
+    const close = lines.find((l) => l.includes('event=conversation_close'));
+    expect(close).toBeDefined();
+    // chunks=1 (we ATTEMPTED to send one chunk) but reply_sent=false
+    // (Twilio rejected it, so the customer didn't actually receive it).
+    expect(close).toMatch(/chunks=1/);
+    expect(close).toMatch(/reply_sent=false/);
+    logSpy.mockRestore();
+  });
+
+  it('dispatch_thrown branch emits TWO error lines (dispatch_thrown + conversation_close) to keep close-line at 11-field cap', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    runSmsAiV2AgentMock.mockRejectedValueOnce(new Error('runner boom'));
+
+    await runV2AgentInBackground(BASE_INPUT);
+
+    const lines = errorSpy.mock.calls.map((c) => String(c[0]));
+    const dispatchLine = lines.find((l) => l.includes('event=dispatch_thrown'));
+    const closeLine = lines.find((l) => l.includes('event=conversation_close'));
+
+    // First line carries the error message (kept off conversation_close to
+    // respect the 11-field cap).
+    expect(dispatchLine).toBeDefined();
+    expect(dispatchLine).toMatch(/error_class=dispatch_thrown/);
+    expect(dispatchLine).toMatch(/runner boom/);
+
+    // Second line is the canonical conversation_close — operator's uniform
+    // grep target regardless of outcome.
+    expect(closeLine).toBeDefined();
+    expect(closeLine).toMatch(/stop=dispatch_thrown/);
+    expect(closeLine).toMatch(/reply_sent=false/);
+    expect(closeLine).toMatch(/error_class=dispatch_thrown/);
     errorSpy.mockRestore();
   });
 });

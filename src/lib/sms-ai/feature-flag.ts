@@ -23,6 +23,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
+import { formatErrorMessage, formatLogFields } from '@/lib/sms-ai/observability';
 
 export interface SmsAiV2FeatureFlags {
   killSwitch: boolean;
@@ -133,7 +134,15 @@ export async function loadSmsAiV2Flags(): Promise<SmsAiV2FeatureFlags> {
       ]);
 
     if (error || !data) {
-      console.warn('[SmsAiV2 flag] load failed — defaulting to disabled:', error?.message);
+      console.warn(
+        `[SmsAiV2] ${formatLogFields({
+          event: 'flag_load_error',
+          error_class: 'flag_load_error',
+          reason: 'load_failed',
+          message: error?.message ?? null,
+          defaulting: 'disabled',
+        })}`,
+      );
       return { ...SAFE_DEFAULT_FLAGS };
     }
 
@@ -146,7 +155,15 @@ export async function loadSmsAiV2Flags(): Promise<SmsAiV2FeatureFlags> {
       globallyEnabled: coerceBool(map.get(SMS_AI_V2_FLAG_KEYS.GLOBALLY_ENABLED)),
     };
   } catch (err) {
-    console.warn('[SmsAiV2 flag] load threw — defaulting to disabled:', err);
+    console.warn(
+      `[SmsAiV2] ${formatLogFields({
+        event: 'flag_load_error',
+        error_class: 'flag_load_error',
+        reason: 'load_threw',
+        message: formatErrorMessage(err),
+        defaulting: 'disabled',
+      })}`,
+    );
     return { ...SAFE_DEFAULT_FLAGS };
   }
 }
