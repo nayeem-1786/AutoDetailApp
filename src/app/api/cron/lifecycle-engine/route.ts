@@ -263,7 +263,7 @@ export async function GET(request: NextRequest) {
           customer_id,
           created_at,
           customer:customers(id, first_name, last_name),
-          quote:quotes(id, quote_number, items:quote_items(*))
+          quote:quotes!appointments_quote_id_fkey(id, quote_number, items:quote_items(*))
         `)
         .eq('channel', 'customer_accept')
         .eq('status', 'pending')

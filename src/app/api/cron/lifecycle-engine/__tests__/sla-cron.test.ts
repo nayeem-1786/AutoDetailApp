@@ -22,13 +22,18 @@ vi.mock('@/lib/utils/feature-flags', () => ({
   isFeatureEnabled: vi.fn(async () => true),
 }));
 
-// renderSmsTemplate + sendSms — drives the SLA fire path.
+// renderSmsTemplate + sendSms — drives the SLA fire path. Mock factories
+// keep the `(...args: unknown[]) => mock(...args)` shape and rely on the
+// underlying mocks being bare `vi.fn()` (inferred `Mock<any[], any>`) so
+// the spread-arg-into-rest-param contract holds. Defaults for the SLA
+// fire path are set in `beforeEach` via `.mockResolvedValue` /
+// `.mockReturnValue` — see Session #153 doc note in beforeEach.
 const renderSmsTemplateMock = vi.fn();
 vi.mock('@/lib/sms/render-sms-template', () => ({
   renderSmsTemplate: (...args: unknown[]) => renderSmsTemplateMock(...args),
 }));
 
-const sendSmsMock = vi.fn(async () => ({ success: true }));
+const sendSmsMock = vi.fn();
 vi.mock('@/lib/utils/sms', () => ({
   sendSms: (...args: unknown[]) => sendSmsMock(...args),
   sendMarketingSms: vi.fn(async () => ({ success: true })),
@@ -38,8 +43,8 @@ vi.mock('@/lib/utils/email', () => ({
   sendEmail: vi.fn(async () => ({ success: true })),
 }));
 
-// Business hours predicate — flipped per-test.
-const isWithinBusinessHoursMock = vi.fn(() => true);
+// Business hours predicate — flipped per-test (default in beforeEach).
+const isWithinBusinessHoursMock = vi.fn();
 vi.mock('@/lib/data/business-hours', () => ({
   getBusinessHours: vi.fn(async () => ({ monday: { open: '08:00', close: '20:00' } })),
   isWithinBusinessHours: (...args: unknown[]) => isWithinBusinessHoursMock(...args),
@@ -151,8 +156,15 @@ beforeEach(() => {
   process.env.CRON_API_KEY = VALID_KEY;
   supabaseState.pendingAppointments = [];
   supabaseState.recentAuditRows = [];
+  // Session #153 — `.mockReset()` (clears impl + history) replaces
+  // `.mockClear()` for sendSmsMock because the default impl now comes
+  // from `beforeEach.mockResolvedValue(...)` below (was inline `vi.fn(impl)`
+  // — moved to make the mock symmetric with renderSmsTemplateMock +
+  // isWithinBusinessHoursMock as `Mock<any[], any>`, see comment above
+  // the mock declarations). `.mockClear()` would compound impls across
+  // tests; `.mockReset()` keeps each test isolated.
   renderSmsTemplateMock.mockReset();
-  sendSmsMock.mockClear();
+  sendSmsMock.mockReset();
   isWithinBusinessHoursMock.mockReset();
   logAuditMock.mockClear();
 
@@ -161,6 +173,7 @@ beforeEach(() => {
     body: 'SLA alert body',
     recipientPhones: ['+15555550100'],
   });
+  sendSmsMock.mockResolvedValue({ success: true });
   isWithinBusinessHoursMock.mockReturnValue(true);
 });
 
@@ -261,6 +274,40 @@ describe('lifecycle-engine Phase 4 SLA — empty candidate set', () => {
     expect(body.sla.fired).toBe(0);
     expect(body.sla.skipped_hours).toBe(0);
     expect(sendSmsMock).not.toHaveBeenCalled();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Regression guards — Session #153 (2026-06-18)
+//
+// Phase 4 SLA scan was silently failing in production with PGRST201
+// "Could not embed because more than one relationship was found for
+// 'appointments' and 'quotes'" — root cause: dual FK exists between
+// appointments.quote_id → quotes.id (added 2026-06-07,
+// 20260607202559_appointments_ac12_schema_additions.sql) AND
+// quotes.converted_appointment_id → appointments.id (the original direction).
+// PostgREST cannot auto-pick when both exist.
+//
+// Fix: forward FK hint `!appointments_quote_id_fkey` on the quote embed.
+// This source-string guard catches accidental removal of the hint OR
+// accidental duplication of an unhinted embed.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('lifecycle-engine Phase 4 SLA — regression guards', () => {
+  it('pending-appointments query uses appointments_quote_id_fkey FK hint (PGRST201 disambiguation)', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const routeSrc = fs.readFileSync(
+      path.resolve(__dirname, '..', 'route.ts'),
+      'utf8',
+    );
+
+    // Positive: the FK-hinted embed is present
+    expect(routeSrc).toMatch(/quote:quotes!appointments_quote_id_fkey\(/);
+
+    // Negative: no bare `quote:quotes(` embed elsewhere in the file
+    // (a bare embed would re-trigger PGRST201 under the dual-FK regime)
+    expect(routeSrc).not.toMatch(/quote:quotes\(/);
   });
 });
 

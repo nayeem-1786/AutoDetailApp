@@ -6,6 +6,29 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Fix: lifecycle-engine Phase 4 SLA cron PGRST201 disambiguation (2026-06-18, Session #153)
+
+**Production cron had been silently failing on every business-hours run.** The `/api/cron/lifecycle-engine` Phase 4 SLA scan (`AC-12` pending-appointment alerts) was throwing `PGRST201: Could not embed because more than one relationship was found for 'appointments' and 'quotes'` on every execution. Pending-accept appointments past `AC12_SLA_THRESHOLD_MINUTES` (60min) were going un-alerted to staff for the full window since the dual-FK regime landed on 2026-06-07 (`20260607202559_appointments_ac12_schema_additions.sql` added `appointments.quote_id` as a forward back-link alongside the existing `quotes.converted_appointment_id` reverse link).
+
+**Root cause:** PostgREST cannot auto-pick a relationship when two FKs exist between the same pair of tables. The query at `route.ts:266` had a bare `quote:quotes(...)` embed which Postgres-REST refused with PGRST201.
+
+**Fix (one site, one edit):** added explicit forward-FK hint to the embed:
+```typescript
+quote:quotes!appointments_quote_id_fkey(id, quote_number, items:quote_items(*))
+```
+
+**Audit confirmed isolation** — full-repo grep for actual PostgREST `quotes()` embed syntax (after filtering English-prose false positives in comments) found this is the ONLY site in the codebase with the dual-FK exposure. Inverse direction (`quotes → appointments` embeds) also clean. No bundled fixes needed across the 5 sibling files that query `appointments` and reference `quotes`.
+
+**Tests (+1 → 3465):** new `regression guards` describe block in `sla-cron.test.ts` with two assertions — positive (FK-hinted embed string present in route source) AND negative (no bare `quote:quotes(` embed elsewhere in file, which would re-trigger PGRST201). Source-string structural test per operator pattern preference (no full mock-the-supabase-client harness needed for a bug this localized).
+
+**Pre-existing TS2556 errors at `sla-cron.test.ts:33,45` cleared as part of the same touch** — mock factories changed from `(...args: unknown[]) => mock(...args)` against narrowly-inferred `Mock<[], ...>` mocks (which violated TS2556 spread-arg rules) to the symmetric all-`Mock<any[], any>` pattern via bare `vi.fn()` + default impls moved to `beforeEach.mockResolvedValue` / `mockReturnValue`. Required `.mockClear()` → `.mockReset()` switch for `sendSmsMock` to avoid impl compounding across tests. Path A'' chosen after Paths A + A' demonstrated TS2554/TS2556 didn't yield. `customer-accept-service.test.ts:44,49,73` TS2556 errors remain (pre-existing, intentionally out of scope per Targeted-discipline Memory #29).
+
+**Hard rules respected:** NO changes to SLA threshold / cooldown / audit_log shape / business-hours logic. NO new dependencies. NO migrations (schema is correct; the bug was a missing FK hint in the embed string, not a schema gap). Scope: 2 prod-adjacent files MOD (route.ts + sla-cron.test.ts) + this CHANGELOG entry + ROADMAP-13-ITEMS ledger row #153 + ~10 LoC net. Gates: tsc 5 baseline → 3 (sla-cron lines cleared), lint 0 new, vitest 3464 → 3465 (+1 regression test), build clean.
+
+**Post-deploy verification (operator runs):** `ssh root@31.220.60.157 'pm2 logs smart-details --lines 200 --nostream 2>&1 | grep -E "Lifecycle SLA|PGRST201"'`. After next cron run inside business hours, expect ZERO `PGRST201` lines and either successful `[Lifecycle SLA]` informational logs (if candidates found) OR quiet (if outside hours / no candidates).
+
+---
+
 ## Layer 5 Phase C + partial Layer 6 — SMS AI v2 v1 eradication + admin DB-prompt wiring (2026-06-18)
 
 **v2 is now the SOLE SMS AI path in code.** Phase C deletes the v1 legacy single-shot responder + completes the long-running admin UI ↔ runtime prompt-wiring gap surfaced in the 2026-05-19 audit (`docs/dev/SMS_AI_AUTOREPLY_AUDIT_2026-05-19.md` §10). Phase B operator-driven monitoring (10 AI replies in 13 hours after Phase A's global flip, zero anomalies) green-lit the cutover. Operator pre-flight verification of `business_settings.messaging_ai_instructions` (existing 6,549-byte row = verbatim v1 default, zero customization) confirmed the seed overwrite is safe.
