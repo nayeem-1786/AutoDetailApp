@@ -46,6 +46,14 @@ type FullTransaction = Transaction & {
   customer: Customer | null;
   employee: Employee | null;
   jobs: LinkedJob[] | null;
+  // Session #155 (Item 3): M-to-1 embed of the linked appointment so the
+  // Total row can apply the canonical formula
+  // `Math.max(appointment.total_amount ?? 0, total_amount) + tip_amount`,
+  // matching thermal/email/SMS-link/print-copier/public-receipt-page.
+  // Null when this transaction has no `appointment_id` (walk-in pre-Phase-0a)
+  // or when PostgREST resolves the embed to no row.
+  // Audit: docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md (Surface D).
+  appointment: { total_amount: number } | null;
 };
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
@@ -390,7 +398,20 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
               <div className="flex justify-between">
                 <span className="font-semibold text-gray-900 dark:text-gray-100">Total</span>
                 <span className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-                  {formatCurrency(transaction.total_amount)}
+                  {/* Session #155 (Item 3): canonical Total formula.
+                      Pre-fix this rendered `transaction.total_amount` only,
+                      excluding tip — producing an S0 reconciliation
+                      discrepancy vs the receipt (which adds tip in TOTAL).
+                      The `Math.max(appointment_total, total_amount)` clause
+                      handles close-out shells (transaction $0, appointment
+                      carries gross) vs in-store sales exceeding appointment
+                      value. Mirrors thermal/email/SMS-link/print-copier/
+                      public-receipt-page. Audit:
+                      docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md (Surface D). */}
+                  {formatCurrency(
+                    Math.max(transaction.appointment?.total_amount ?? 0, transaction.total_amount) +
+                      (transaction.tip_amount ?? 0)
+                  )}
                 </span>
               </div>
             </div>

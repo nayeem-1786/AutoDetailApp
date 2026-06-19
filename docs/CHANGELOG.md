@@ -6,6 +6,59 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 3 — Receipt Tip Display Audit + Surface D fix (POS admin Transactions Total row) (2026-06-19, Session #155)
+
+**Audit + targeted fix bundled per Memory #29 Type 1 Targeted Audit.** Closes Item 3 of the 13-item roadmap by validating tip-line rendering across every receipt-and-transaction surface and shipping the one bug surfaced. Audit doc: `docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md` (5-surface matrix + Adjacent Surfaces section + aggregate findings).
+
+### Audit findings
+
+5 surfaces inspected (operator's original 6-surface list reduced to 5 — "Email PDF receipt" does not exist in the codebase: `sendEmail()` in `src/lib/utils/email.ts:27` has no attachment parameter, so the email receipt is HTML body + plain-text fallback only; only PDF generation in the repo is `pdfkit` for **quotes**, not receipts):
+
+| Surface | Verdict |
+|---|---|
+| A — Email HTML receipt (`generateReceiptHtml` via `receipt-template.ts:1172`+`:1482`) | ✅ Renders correctly |
+| B — SMS receipt link → public receipt page (`/receipt/[token]/page.tsx:318`+`:361`) | ✅ Renders correctly |
+| C — Browser-print receipt (`/api/pos/receipts/html` + `print-copier`, same `generateReceiptHtml`) | ✅ Renders correctly |
+| **D — POS admin Transactions detail (`pos/components/transactions/transaction-detail.tsx:393`)** | **⚠️ Renders with bug — S0** |
+| E — Job ticket display (no tip render in `src/app/pos/jobs/`) | ✅ N/A by design (tip is post-checkout; job tickets are pre/during-service) |
+
+Adjacent surfaces (outside operator's original 6-list, captured in the audit doc): (1) orphan `src/components/account/transaction-detail.tsx` — zero callers since the Phase 4 Customer Portal bulk-add 2026-02-03 (4 months 16 days ago); latent same-bug-class as Surface D — deleted this session (see Removed below); (2) `src/components/account/transaction-card.tsx:57` (portal Transaction summary) — `total_amount` excludes tip in card display; **deferred to a separate session per operator decision**; (3) `src/components/account/appointment-card.tsx:145` — correct by construction (appointment-level summary, tip is transaction-time only).
+
+### Fixed
+
+- **POS Transactions detail — Total row now includes tip (S0).** `src/app/pos/components/transactions/transaction-detail.tsx:393` was rendering `formatCurrency(transaction.total_amount)` without `+ tip_amount`, producing a visible discrepancy vs the receipt (which correctly includes tip). For example: receipt #SD-006297 displayed $552 on every receipt surface (correct, $460 + $92 tip), but the same transaction in the POS admin Transactions detail rendered Total = $460 — operator-visible reconciliation hazard. Per `docs/dev/DB_SCHEMA.md:3008-3011`, `transactions.tip_amount` and `transactions.total_amount` are separate columns; `total_amount` does NOT include tip; every other receipt surface adds `+ tip_amount` at the Total line. Now uses the canonical formula `Math.max(transaction.appointment?.total_amount ?? 0, transaction.total_amount) + (transaction.tip_amount ?? 0)`, matching thermal / email HTML / SMS-link public page / browser-print / print-copier byte-equivalently. The `Math.max(appointment_total, total_amount)` clause handles close-out shells (transaction $0, appointment carries gross) vs in-store sales exceeding appointment value — same policy as `src/app/pos/lib/receipt-template.ts:723`+`:1482` and `src/app/(public)/receipt/[token]/page.tsx:361`. Per-line Tip row (`:381-388`) and per-payment Tip sub-line (`:334-338`) were already correct; only the Total row had the bug. Audit: `docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md` (Surface D row).
+
+### Removed
+
+- **Orphan dead-code removal — `src/components/account/transaction-detail.tsx`** (~150 lines, zero callers since 2026-02-03 initial Phase 4 Customer Portal bulk add, latent same-bug-class as Surface D — its `:149` would have rendered `formatCurrency(data.total_amount)` without tip if any surface had ever imported it). 4 months 16 days continuous orphan; safe deletion per operator's orphan rule (both conditions satisfied: orphan >3 months AND from initial bulk setup without subsequent feature work; the May 14 Money-Unify-3 sweep touch was reverted same day by `209ffc35`). Companion FILE_TREE.md entry removed.
+
+### What shipped
+
+- **API SELECT extended** (`src/app/api/pos/transactions/[id]/route.ts:46-66`) — added `appointment:appointments!appointment_id(total_amount)` M-to-1 embed with explicit FK hint. Mirrors the SLA cron precedent (Session #153, commit `c931becc`) — explicit FK hint survives future FK additions between `transactions` and `appointments` without PGRST201 ambiguity. PostgREST returns a single object (or null) per the M-to-1 child→parent embed-cardinality rule; pattern matches the existing `customer:customers(...)` / `vehicle:vehicles(...)` / `employee:employees(...)` embeds in the same SELECT. Inline comment links back to the audit doc.
+- **FullTransaction type extended** (`src/app/pos/components/transactions/transaction-detail.tsx:42-57`) — added `appointment: { total_amount: number } | null` to the intersection so the Total formula can access `transaction.appointment?.total_amount` type-safely. Base `Transaction` interface (`src/lib/supabase/types.ts:389-418`) unchanged — `appointment_total` is NOT a transactions-table column; the field is only available as an embed, which is the correct typing.
+- **Canonical Total formula at `:393`** — replaces the bare `formatCurrency(transaction.total_amount)` with `formatCurrency(Math.max(transaction.appointment?.total_amount ?? 0, transaction.total_amount) + (transaction.tip_amount ?? 0))`. Inline comment block documents the formula's purpose + the Math.max close-out-shell rationale + audit link.
+- **4 regression tests** (`src/app/pos/components/transactions/__tests__/transaction-detail-total-with-tip.test.tsx`, new — 5 test invocations across 4 describe cases, matching operator's locked spec): (1) Total = total_amount + tip_amount when tip > 0 (bug guard); (2) Total = total_amount when tip = 0 (zero-tip case); (3) Total uses appointment_total via Math.max in close-out shell — uses the audit's real-world $552 / $460 / $92 receipt #SD-006297 fixture shape; (4) Tip row renders only when tip_amount > 0 (preserves existing conditional at `:381` — two sub-renders: tip>0 asserts Tip present, tip=0 asserts Tip absent). Scaffold mirrors the existing `transaction-detail-void.test.tsx` (`posFetch` mock + permission mock + `QboSyncBadge` / `ReceiptOptions` / `RefundDialog` / `sonner` mocks). `readTotalAmount()` helper walks from the `font-semibold` "Total" label up to the row container, then picks the last `<span>` — anchors specifically on the Totals-block instance rather than the page header.
+- **Audit doc** `docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md` — Adjacent-2 row gains a "Status (locked Session #155): Deferred" note so the audit doc reflects post-fix reality.
+- **FILE_TREE.md** — orphan path removed (line 1416 pre-session).
+- **ROADMAP-13-ITEMS.md** — Item 3 flipped from `⚪ not started` → `✅ done` across (a) the 13-Item Status Table at line 37; (b) the Item 3 dedicated section header at line 2721 (Status: done + completion date + session ref + outcome summary); (c) the Roll-up at line 58 (Done count 9 → 10, item enumeration extended) + line 61 (Not started 10 → 9, list pruned); (d) Per-item evidence table at line 90 (Item 3 row updated to DONE with this session's commit reference); plus session #155 ledger row at the bottom of the table.
+
+### Hard rules respected (per Session #155 lock)
+
+- NO scope creep into Adjacent-2 or Adjacent-3 (explicitly deferred). NO new dependencies. NO migrations (UI display fix only — `transactions` schema unchanged). All changes bundled into ONE commit (audit doc + 5 production touches + 4 tests + 1 deletion + 4 doc updates + this CHANGELOG entry).
+
+### Gates
+
+- **tsc:** 3 baseline preserved (the `customer-accept-service.test.ts:44,49,73` TS2556 pre-existing trio unchanged per Memory #29 Targeted-discipline). No new errors on changed files.
+- **lint:** 0 new errors / 0 new warnings on changed files. Baseline 98 warnings preserved.
+- **vitest:** _baseline + 4 new tests_ — see gates summary surfaced before commit.
+- **build:** clean.
+
+### Not a sibling fix — this IS the 13-item entry
+
+This is the **first 13-item entry since Session #145** (2026-06-03 doc-only audit) and the first 13-item code-fix entry since Session #144 cluster (2026-06-03 catalog Q-D doc). The Wave 2 tip cluster (Items 2 / 3 / 4) is now 1/3 done. Item 2 (Stripe payment-link `tip_settings`) is queued as the next Wave 2 session; Item 4 (cash tip capture + splitting + reporting) remains the largest of the trio.
+
+---
+
 ## Workstream A — SMS AI v2 Layer 6 Tier 1 observability (2026-06-19, Session #154)
 
 **Goal:** bring v2's stdout observability up to the "structure + persistence + consumability" bar that the lifecycle-engine cron sets, without committing to Tier 2 audit_log persistence yet. Pure-stdout work — no schema changes, no migrations, no admin UI, no behavior changes to v2 routing/agent loop/tool execution/prompt loading/any decision logic.

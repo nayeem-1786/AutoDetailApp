@@ -1413,7 +1413,6 @@ src/components/account/profile-completion-banner.tsx
 src/components/account/appointment-card.tsx
 src/components/account/coupon-card.tsx
 src/components/account/transaction-card.tsx
-src/components/account/transaction-detail.tsx
 src/components/account/vehicle-card.tsx
 src/components/account/vehicle-form-dialog.tsx
 ```

@@ -43,6 +43,13 @@ export async function GET(
     }
     const supabase = createAdminClient();
 
+    // Session #155 (Item 3): embed appointment.total_amount so the admin
+    // Transactions detail can apply the canonical Total formula
+    // `Math.max(appointment_total ?? 0, total_amount) + tip_amount`. The
+    // explicit `!appointment_id` FK hint mirrors the SLA cron precedent
+    // (Session #153, commit `c931becc`) and survives future FK additions
+    // between transactions and appointments without PGRST201 ambiguity.
+    // Audit: docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md (Surface D).
     const { data: transaction, error } = await supabase
       .from('transactions')
       .select(`
@@ -50,6 +57,7 @@ export async function GET(
         customer:customers(id, first_name, last_name, phone, email, customer_type, created_at),
         vehicle:vehicles(id, vehicle_type, year, make, model, color, size_class),
         employee:employees(id, first_name, last_name),
+        appointment:appointments!appointment_id(total_amount),
         items:transaction_items(*),
         payments(*),
         refunds(*, refund_items(*)),
