@@ -49,7 +49,6 @@ export const SMS_SLUGS = [
   "quote_viewed_followup",
   "receipt_sms",
   "staff_notification",
-  "staff_notification_inbound_specialty",
   "waitlist_slot_available",
 ] as const;
 
@@ -93,7 +92,6 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   quote_viewed_followup: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
   receipt_sms: { required: ["summary_line", "receipt_link"], optional: ["first_name", "last_name", "vehicle_description"] },
   staff_notification: { required: ["reason_label", "customer_name", "details", "customer_phone"], optional: ["customer_email", "last_name", "vehicle_description"] },
-  staff_notification_inbound_specialty: { required: ["customer_name", "customer_phone", "vehicle_description"], optional: ["customer_email", "size_class", "customer_message_excerpt"] },
   waitlist_slot_available: { required: ["service_name", "appointment_date"], optional: ["first_name", "last_name", "business_name", "business_phone"] },
 };
 
@@ -386,17 +384,6 @@ export interface RenderVarsBySlug {
     customer_email?: string | undefined;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
-    business_name?: string | undefined;
-    business_phone?: string | undefined;
-    business_address?: string | undefined;
-  };
-  staff_notification_inbound_specialty: {
-    customer_name: string;
-    customer_phone: string;
-    vehicle_description: string;
-    customer_email?: string | undefined;
-    size_class?: string | undefined;
-    customer_message_excerpt?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;

@@ -13,7 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { TogglePill } from '@/components/ui/toggle-pill';
-import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
+import { getStandardTemplate } from '@/lib/sms-ai/system-prompt';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
@@ -135,7 +135,7 @@ export default function MessagingSettingsPage() {
 
       // Populate with default prompt if no saved instructions
       if (!loaded.messaging_ai_instructions.trim()) {
-        loaded.messaging_ai_instructions = getDefaultSystemPrompt();
+        loaded.messaging_ai_instructions = getStandardTemplate();
       }
 
       // Display stored E.164 phones as "(XXX) XXX-XXXX" in the input; submit
@@ -623,7 +623,7 @@ export default function MessagingSettingsPage() {
         onConfirm={() => {
           setSettings((prev) => ({
             ...prev,
-            messaging_ai_instructions: getDefaultSystemPrompt(),
+            messaging_ai_instructions: getStandardTemplate(),
           }));
           setResetPromptOpen(false);
         }}

@@ -1,8 +1,50 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Phase C (Workstream A Layer 5, 2026-06-18) — await buildV2SystemPrompt is now
+// async + DB-first. By default the supabase admin mock returns null for
+// the messaging_ai_instructions row, forcing the hardcoded fallback path
+// (getStandardTemplate). Existing 174 tests assert prompt CONTENT, which
+// is byte-identical between the DB-set and fallback paths once grounding
+// substitutions are applied — so the migration to async is a pure await
+// + mock additions. New tests further down exercise the DB-set path,
+// the null/empty/error fallback branches, and the getStandardTemplate
+// snapshot contract directly.
+const messagingAiInstructionsValue: { value: unknown; error: { message: string } | null } = {
+  value: null,
+  error: null,
+};
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: () => ({
+    from: (_table: string) => ({
+      select: (_cols: string) => ({
+        eq: (_col: string, _key: string) => ({
+          maybeSingle: () =>
+            Promise.resolve({
+              data:
+                messagingAiInstructionsValue.value === null
+                  ? null
+                  : { value: messagingAiInstructionsValue.value },
+              error: messagingAiInstructionsValue.error,
+            }),
+        }),
+      }),
+    }),
+  }),
+}));
+
+beforeEach(() => {
+  messagingAiInstructionsValue.value = null;
+  messagingAiInstructionsValue.error = null;
+});
 
 import {
   buildV2SystemPrompt,
   CUSTOMER_CONTEXT_PLACEHOLDER,
+  BUSINESS_NAME_PLACEHOLDER,
+  BUSINESS_HOURS_PLACEHOLDER,
+  CURRENT_DATE_PLACEHOLDER,
+  getStandardTemplate,
 } from '@/lib/sms-ai/system-prompt';
 
 const SAMPLE_INPUTS = {
@@ -12,31 +54,31 @@ const SAMPLE_INPUTS = {
 };
 
 describe('buildV2SystemPrompt — structural output', () => {
-  it('returns a non-empty string', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('returns a non-empty string', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(typeof out).toBe('string');
     expect(out.length).toBeGreaterThan(1500);
   });
 
-  it('interpolates businessName', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('interpolates businessName', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Smart Details Auto Spa');
   });
 
-  it('interpolates businessHours and currentDate', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('interpolates businessHours and currentDate', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Mon–Fri 9–6, Sat 10–4, Sun closed');
     expect(out).toContain('2026-05-18');
   });
 
-  it('includes the {CUSTOMER_CONTEXT} placeholder UN-substituted (runner fills it later)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes the {CUSTOMER_CONTEXT} placeholder UN-substituted (runner fills it later)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain(CUSTOMER_CONTEXT_PLACEHOLDER);
     expect(CUSTOMER_CONTEXT_PLACEHOLDER).toBe('{CUSTOMER_CONTEXT}');
   });
 
-  it('contains all 8 required section headings (post-2026-05-22 rename)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('contains all 8 required section headings (post-2026-05-22 rename)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/# Identity/);
     expect(out).toMatch(/# Channel rules/);
     expect(out).toMatch(/# Critical rules/);
@@ -47,37 +89,37 @@ describe('buildV2SystemPrompt — structural output', () => {
     expect(out).toMatch(/# Grounding/);
   });
 
-  it('opens with the Tom persona on first line', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('opens with the Tom persona on first line', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/You are Tom/);
   });
 
-  it('declares America/Los_Angeles timezone', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares America/Los_Angeles timezone', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('America/Los_Angeles');
   });
 
-  it('declares SMS-channel constraints (segment length, no markdown)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares SMS-channel constraints (segment length, no markdown)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out.toLowerCase()).toContain('160 char');
     expect(out.toLowerCase()).toContain('no markdown');
   });
 
-  it('enforces the one-primary-service quote rule', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('enforces the one-primary-service quote rule', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/one primary service/i);
   });
 
-  it('forbids specialty-vehicle quoting and directs to notify_staff', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('forbids specialty-vehicle quoting and directs to notify_staff', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out.toLowerCase()).toContain('exotic');
     expect(out.toLowerCase()).toContain('classic');
     expect(out).toContain('notify_staff');
     expect(out).toContain('custom_quote');
   });
 
-  it('lists all 7 notify_staff reasons in the escalation guide', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('lists all 7 notify_staff reasons in the escalation guide', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     for (const reason of [
       'appointment_change',
       'custom_quote',
@@ -91,8 +133,8 @@ describe('buildV2SystemPrompt — structural output', () => {
     }
   });
 
-  it('names every tool in the tool usage guide section', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('names every tool in the tool usage guide section', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     for (const tool of [
       'lookup_customer',
       'get_services',
@@ -112,26 +154,26 @@ describe('buildV2SystemPrompt — structural output', () => {
     }
   });
 
-  it('honors STOP/UNSUBSCRIBE silent-handoff rule', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('honors STOP/UNSUBSCRIBE silent-handoff rule', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out.toUpperCase()).toContain('STOP');
     expect(out.toUpperCase()).toContain('UNSUBSCRIBE');
   });
 
-  it('forbids inventing discounts/promotions', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('forbids inventing discounts/promotions', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out.toLowerCase()).toMatch(/never (invent|offer discount)/);
   });
 
-  it('produces identical output for identical inputs (no Date.now hidden injection)', () => {
-    const a = buildV2SystemPrompt(SAMPLE_INPUTS);
-    const b = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('produces identical output for identical inputs (no Date.now hidden injection)', async () => {
+    const a = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    const b = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(a).toBe(b);
   });
 
-  it('substitutes only the explicit inputs — replacing businessName changes output', () => {
-    const a = buildV2SystemPrompt(SAMPLE_INPUTS);
-    const b = buildV2SystemPrompt({ ...SAMPLE_INPUTS, businessName: 'Other Co' });
+  it('substitutes only the explicit inputs — replacing businessName changes output', async () => {
+    const a = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    const b = await buildV2SystemPrompt({ ...SAMPLE_INPUTS, businessName: 'Other Co' });
     expect(a).not.toBe(b);
     expect(b).toContain('Other Co');
     expect(b).not.toContain('Smart Details Auto Spa');
@@ -143,35 +185,35 @@ describe('buildV2SystemPrompt — structural output', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
-  it('includes Cross-channel awareness section header', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Cross-channel awareness section header', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('# Cross-channel awareness');
   });
 
-  it('includes Vehicle size mapping (for pricing lookup) section header', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Vehicle size mapping (for pricing lookup) section header', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('# Vehicle size mapping (for pricing lookup)');
   });
 
-  it('includes RO Water section header', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes RO Water section header', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('# RO Water');
   });
 
-  it('includes Language handling section header (renamed from Multi-language support 2026-05-22)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Language handling section header (renamed from Multi-language support 2026-05-22)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('# Language handling');
     // Old header must NOT remain — prevents accidental duplicate section
     expect(out).not.toContain('# Multi-language support');
   });
 
-  it('includes What you cannot do section header', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes What you cannot do section header', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('# What you cannot do');
   });
 
-  it('Critical rules section contains exactly 22 numbered rules (D49 auto-send rule added 2026-05-27 as Rule 17; was 21 pre-D49 / 19 pre-D47 / 17 pre-D43)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Critical rules section contains exactly 22 numbered rules (D49 auto-send rule added 2026-05-27 as Rule 17; was 21 pre-D49 / 19 pre-D47 / 17 pre-D43)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx, 'expected # Critical rules header to exist').toBeGreaterThan(-1);
     const afterHeader = out.slice(criticalIdx + '# Critical rules'.length);
@@ -181,14 +223,14 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(numbered.length).toBe(22);
   });
 
-  it('{CUSTOMER_CONTEXT} placeholder appears exactly once', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('{CUSTOMER_CONTEXT} placeholder appears exactly once', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const occurrences = out.split(CUSTOMER_CONTEXT_PLACEHOLDER).length - 1;
     expect(occurrences).toBe(1);
   });
 
-  it('all three dynamic inputs appear in the output (sanity)', () => {
-    const out = buildV2SystemPrompt({
+  it('all three dynamic inputs appear in the output (sanity)', async () => {
+    const out = await buildV2SystemPrompt({
       businessName: 'Acme Detail Co',
       businessHours: 'Mon–Sat 7am–9pm',
       currentDate: '2026-12-25',
@@ -198,16 +240,16 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(out).toContain('2026-12-25');
   });
 
-  it('cross-channel awareness section mentions voice agent and references quotes by number', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('cross-channel awareness section mentions voice agent and references quotes by number', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const crossIdx = out.indexOf('# Cross-channel awareness');
     const section = out.slice(crossIdx, out.indexOf('# Conversation freshness', crossIdx));
     expect(section.toLowerCase()).toContain('voice agent');
     expect(section).toContain('Q-0023');
   });
 
-  it('language-handling section lists supported languages', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('language-handling section lists supported languages', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const langIdx = out.indexOf('# Language handling');
     const section = out.slice(langIdx, out.indexOf('# RO Water', langIdx));
     expect(section).toContain('Spanish');
@@ -222,13 +264,13 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — pending addon authorization section', () => {
-  it('includes the "Pending addon authorization" section header', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes the "Pending addon authorization" section header', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('# Pending addon authorization (mid-job)');
   });
 
-  it('mentions both approve_addon and decline_addon tools in the addon section', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('mentions both approve_addon and decline_addon tools in the addon section', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const addonIdx = out.indexOf('# Pending addon authorization (mid-job)');
     expect(addonIdx).toBeGreaterThan(-1);
     const ctxIdx = out.indexOf('# Context for this conversation', addonIdx);
@@ -237,13 +279,13 @@ describe('buildV2SystemPrompt — pending addon authorization section', () => {
     expect(section).toContain('decline_addon');
   });
 
-  it('references pending_addons context list explicitly', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('references pending_addons context list explicitly', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('pending_addons');
   });
 
-  it('places the addon section BEFORE the {CUSTOMER_CONTEXT} placeholder (cache boundary)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('places the addon section BEFORE the {CUSTOMER_CONTEXT} placeholder (cache boundary)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const addonIdx = out.indexOf('# Pending addon authorization (mid-job)');
     const placeholderIdx = out.indexOf(CUSTOMER_CONTEXT_PLACEHOLDER);
     expect(addonIdx).toBeGreaterThan(-1);
@@ -261,13 +303,13 @@ describe('buildV2SystemPrompt — pending addon authorization section', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — Issue 1 (vehicle naming Y+C+M+M)', () => {
-  it('includes Formatting and naming section header', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Formatting and naming section header', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('# Formatting and naming');
   });
 
-  it('specifies Year + Color + Make + Model order with capitalization', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('specifies Year + Color + Make + Model order with capitalization', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Year + Color + Make + Model');
     // At least one positive Y+C+M+M example present
     expect(out).toMatch(/2016 Silver Honda Accord|2026 Yellow Ferrari Roma Spider/);
@@ -277,8 +319,8 @@ describe('buildV2SystemPrompt — Issue 1 (vehicle naming Y+C+M+M)', () => {
 });
 
 describe('buildV2SystemPrompt — Issue 2 + Issue 3 (closure + short replies)', () => {
-  it('includes Reading short replies subsection in Discovery and conversation flow', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Reading short replies subsection in Discovery and conversation flow', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Reading short replies');
     // Short affirmatives enumerated
     expect(out).toContain('"yes"');
@@ -286,8 +328,8 @@ describe('buildV2SystemPrompt — Issue 2 + Issue 3 (closure + short replies)', 
     expect(out).toContain('"sí"');
   });
 
-  it('includes Graceful closure rule + canonical examples', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Graceful closure rule + canonical examples', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Graceful closure');
     expect(out).toContain('You got it');
     expect(out).toMatch(/talk soon|see you then/i);
@@ -295,8 +337,8 @@ describe('buildV2SystemPrompt — Issue 2 + Issue 3 (closure + short replies)', 
 });
 
 describe('buildV2SystemPrompt — Issue 4 + Issue 5 (Mexican Spanish + current-message-led switching)', () => {
-  it('declares Mexican Spanish dialect with vocab pins', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares Mexican Spanish dialect with vocab pins', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Mexican Spanish');
     expect(out).toContain('carro');
     expect(out).toContain('ustedes');
@@ -304,23 +346,23 @@ describe('buildV2SystemPrompt — Issue 4 + Issue 5 (Mexican Spanish + current-m
     expect(out).toContain('NEVER "vosotros"');
   });
 
-  it('declares current-message-led language switching rule', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares current-message-led language switching rule', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/language of the customer's CURRENT message/);
     expect(out).toContain('in English please');
   });
 });
 
 describe('buildV2SystemPrompt — Issue 6 + Issue 10 (multi-vehicle disambiguation + color rule)', () => {
-  it('declares multi-vehicle disambiguation fires every turn', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares multi-vehicle disambiguation fires every turn', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Multi-vehicle disambiguation');
     expect(out).toContain('fires every turn');
     expect(out).toContain('ALWAYS ask which vehicle');
   });
 
-  it('declares color-ask-once-then-proceed rule (D9 / Issue 10)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares color-ask-once-then-proceed rule (D9 / Issue 10)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // The exact non-loop language
     expect(out).toContain('Color: ask once if missing');
     expect(out).toMatch(/don't loop/i);
@@ -328,16 +370,16 @@ describe('buildV2SystemPrompt — Issue 6 + Issue 10 (multi-vehicle disambiguati
 });
 
 describe('buildV2SystemPrompt — Issue 7 (discovery before menu)', () => {
-  it('declares Discovery before menu enumeration rule', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares Discovery before menu enumeration rule', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Discovery before menu enumeration');
     expect(out).toMatch(/ONE focused clarifying question/);
   });
 });
 
 describe('buildV2SystemPrompt — Issue 8 (quote-intent recognition phrasings)', () => {
-  it('declares quote-send intent recognition with English + Spanish phrasings', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares quote-send intent recognition with English + Spanish phrasings', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Quote-send intent recognition');
     // English variants
     expect(out).toContain('text me the price');
@@ -350,8 +392,8 @@ describe('buildV2SystemPrompt — Issue 8 (quote-intent recognition phrasings)',
 });
 
 describe('buildV2SystemPrompt — Issue 11 + Issue 12 (don\'t ask for name or phone when on file)', () => {
-  it('forbids asking for name when context has one and forbids asking for phone always', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('forbids asking for name when context has one and forbids asking for phone always', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Both forbids inside Critical rule 9
     expect(out).toContain('Use the first name on file; never ask for it');
     expect(out).toContain('NEVER ask the customer to confirm or provide their phone');
@@ -359,28 +401,28 @@ describe('buildV2SystemPrompt — Issue 11 + Issue 12 (don\'t ask for name or ph
 });
 
 describe('buildV2SystemPrompt — Issue 13 (4-hour fresh-conversation threshold, D14)', () => {
-  it('includes Conversation freshness section header', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Conversation freshness section header', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('# Conversation freshness');
   });
 
-  it('declares the 4-hour threshold with both branches', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares the 4-hour threshold with both branches', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/Gap < 4 hours/);
     expect(out).toMatch(/Gap ≥ 4 hours/);
     expect(out).toContain('FRESH request');
   });
 
-  it('declares the explicit-prior-reference exception (carries continuation regardless of elapsed time)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares the explicit-prior-reference exception (carries continuation regardless of elapsed time)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('explicitly references prior context');
     expect(out).toMatch(/regardless of elapsed time/);
   });
 });
 
 describe('buildV2SystemPrompt — Issue 14 (bundle-pricing hallucination hard guardrail, D15)', () => {
-  it('Critical rule 20 declares tool-grounded add-ons only (was Rule 14 pre-D38; was Rule 15 pre-D39; was Rule 16 pre-D43; was Rule 17 pre-D47; was Rule 19 pre-D49)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Critical rule 20 declares tool-grounded add-ons only (was Rule 14 pre-D38; was Rule 15 pre-D39; was Rule 16 pre-D43; was Rule 17 pre-D47; was Rule 19 pre-D49)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Rule 20 specifically — shifted 14→15 by D38 (Issue 35 Rule 2 insert),
     // 15→16 by D39 (Issue 36 size_class Rule 6 insert), 16→17 by D43
     // (Issue 38 tier-intent Rule 7 insert), 17→19 by D47 (Issues
@@ -391,8 +433,8 @@ describe('buildV2SystemPrompt — Issue 14 (bundle-pricing hallucination hard gu
     expect(out).toContain('addon_suggestions');
   });
 
-  it('Add-ons and bundle quoting section provides the "no configured bundles" canned response', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Add-ons and bundle quoting section provides the "no configured bundles" canned response', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('# Add-ons and bundle quoting');
     expect(out).toContain('no current bundle pricing configured');
     expect(out).toContain("Don't fabricate");
@@ -400,28 +442,28 @@ describe('buildV2SystemPrompt — Issue 14 (bundle-pricing hallucination hard gu
 });
 
 describe('buildV2SystemPrompt — Issue 15 (proactive add-on disclosure, D16)', () => {
-  it('declares proactive add-on surfacing rule when configured', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares proactive add-on surfacing rule when configured', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('surface proactively');
     expect(out).toMatch(/SAME message as the standalone quote/);
     expect(out).toContain("don't wait for pushback");
   });
 
-  it('uses tool-response fields combo_price + savings when surfacing', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('uses tool-response fields combo_price + savings when surfacing', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('combo_price');
     expect(out).toContain('savings');
   });
 
-  it('caps add-on disclosure at one mention per turn', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('caps add-on disclosure at one mention per turn', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('One mention per turn');
   });
 });
 
 describe('buildV2SystemPrompt — section ordering (post-2026-05-22 outline)', () => {
-  it('Formatting and naming appears between Channel rules and Critical rules', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Formatting and naming appears between Channel rules and Critical rules', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const channelIdx = out.indexOf('# Channel rules');
     const formatIdx = out.indexOf('# Formatting and naming');
     const criticalIdx = out.indexOf('# Critical rules');
@@ -429,8 +471,8 @@ describe('buildV2SystemPrompt — section ordering (post-2026-05-22 outline)', (
     expect(formatIdx).toBeLessThan(criticalIdx);
   });
 
-  it('Conversation freshness appears between Cross-channel awareness and Vehicle size mapping', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Conversation freshness appears between Cross-channel awareness and Vehicle size mapping', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const crossIdx = out.indexOf('# Cross-channel awareness');
     const freshIdx = out.indexOf('# Conversation freshness');
     const vmapIdx = out.indexOf('# Vehicle size mapping');
@@ -438,8 +480,8 @@ describe('buildV2SystemPrompt — section ordering (post-2026-05-22 outline)', (
     expect(freshIdx).toBeLessThan(vmapIdx);
   });
 
-  it('Add-ons and bundle quoting appears between Tool usage guide and Discovery and conversation flow', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Add-ons and bundle quoting appears between Tool usage guide and Discovery and conversation flow', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const toolsIdx = out.indexOf('# Tool usage guide');
     const addonsIdx = out.indexOf('# Add-ons and bundle quoting');
     const flowIdx = out.indexOf('# Discovery and conversation flow');
@@ -455,46 +497,46 @@ describe('buildV2SystemPrompt — section ordering (post-2026-05-22 outline)', (
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — Issue 22 (phone-from-SMS, no asking)', () => {
-  it('includes Contact information handling subsection', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Contact information handling subsection', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('## Contact information handling');
   });
 
-  it('declares the hard "never ask for phone on SMS" rule with no-exception wording', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares the hard "never ask for phone on SMS" rule with no-exception wording', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('NEVER ask the customer for their phone number on SMS');
     expect(out).toContain('There is no scenario where it is acceptable');
   });
 
-  it('lists positive acknowledgment examples for "this one" / "number I\'m texting from"', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('lists positive acknowledgment examples for "this one" / "number I\'m texting from"', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('the number I\'m texting from');
     expect(out).toContain('Got it — using this number');
   });
 });
 
 describe('buildV2SystemPrompt — Issue 25 (vehicle info collected in same turn, color not asked mid-booking)', () => {
-  it('includes Vehicle information collection subsection', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Vehicle information collection subsection', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('## Vehicle information collection');
   });
 
-  it('declares year + make + model + color in the SAME turn', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares year + make + model + color in the SAME turn', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('year,\nmake, model, AND color in the SAME turn');
     expect(out).toContain('Year, make, model, and color');
   });
 
-  it('declares ask-color-once-in-next-turn if omitted, then proceed (per D9)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares ask-color-once-in-next-turn if omitted, then proceed (per D9)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('ask for color ONCE in the next turn');
     expect(out).toContain("don't loop on it");
   });
 });
 
 describe('buildV2SystemPrompt — Issue 24 (no internal-mechanics leakage)', () => {
-  it('includes Never expose internal mechanics subsection inside What you cannot do', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Never expose internal mechanics subsection inside What you cannot do', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const mechanicsIdx = out.indexOf('## Never expose internal mechanics');
     const cannotDoIdx = out.indexOf('# What you cannot do');
     const pendingIdx = out.indexOf('# Pending addon authorization');
@@ -503,29 +545,29 @@ describe('buildV2SystemPrompt — Issue 24 (no internal-mechanics leakage)', () 
     expect(mechanicsIdx).toBeLessThan(pendingIdx);
   });
 
-  it('enumerates forbidden language: tool names, IDs, "behind the scenes", database concepts', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('enumerates forbidden language: tool names, IDs, "behind the scenes", database concepts', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('"Behind the scenes"');
     expect(out).toContain('Service IDs, customer IDs, quote IDs');
     expect(out).toContain('Tool names');
     expect(out).toContain('size_class names like "suv_3row_van"');
   });
 
-  it('declares recoverable vs non-recoverable handling without leaking the issue', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares recoverable vs non-recoverable handling without leaking the issue', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('If recoverable: redirect conversationally without mentioning the issue');
     expect(out).toContain('Let me have a team member follow up with you');
   });
 });
 
 describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availability claims)', () => {
-  it('includes Booking flow — quote first, scheduling second subsection', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Booking flow — quote first, scheduling second subsection', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('## Booking flow — quote first, scheduling second');
   });
 
-  it('forbids direct create_appointment call in the booking flow', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('forbids direct create_appointment call in the booking flow', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('DO NOT call `create_appointment` in this flow');
     // D49 reflowed the opening paragraph; the "You DO NOT book the
     // appointment directly" anti-direct-booking sentence is preserved
@@ -533,8 +575,8 @@ describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availa
     expect(out).toContain('You DO NOT book the appointment directly');
   });
 
-  it('includes the canonical post-quote handoff line (D49 auto-send phrasing)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes the canonical post-quote handoff line (D49 auto-send phrasing)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // D49 (Issue 45, 2026-05-27): the canonical post-quote handoff line is
     // now the auto-send reply "Sending the quote now — check your texts!"
     // (tool-result-agnostic per Critical Rule 17 + Issue 27 safety). The
@@ -546,55 +588,55 @@ describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availa
     expect(out).not.toContain('Sent the quote to your phone — tap the link to review and accept');
   });
 
-  it('distinguishes business-hours statements (OK) from specific-slot availability claims (NEVER)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('distinguishes business-hours statements (OK) from specific-slot availability claims (NEVER)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Open/closed days and hours: OK to state from your `businessHours`');
     expect(out).toContain('Specific time slot availability: NEVER state');
   });
 
-  it('lists forbidden availability phrases verbatim', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('lists forbidden availability phrases verbatim', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('"Monday is fully booked,"');
     expect(out).toContain('"9 AM just filled up,"');
   });
 
-  it('forbids predicting staff follow-up timing ("within a few hours")', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('forbids predicting staff follow-up timing ("within a few hours")', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('NEVER say "within a\nfew hours"');
   });
 
-  it('Critical rule 21 declares quote-first / never-book-directly (was Rule 15 pre-D38; was Rule 16 pre-D39; was Rule 17 pre-D43; was Rule 18 pre-D47; was Rule 20 pre-D49)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Critical rule 21 declares quote-first / never-book-directly (was Rule 15 pre-D38; was Rule 16 pre-D39; was Rule 17 pre-D43; was Rule 18 pre-D47; was Rule 20 pre-D49)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/21\.\s+\*\*Quote first, never book directly/);
     expect(out).toContain('NEVER call `create_appointment` directly');
   });
 });
 
 describe('buildV2SystemPrompt — Issue 18 (customer type classification) [revised Workstream J Session 3]', () => {
-  it('includes Customer type classification subsection', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Customer type classification subsection', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('## Customer type classification');
   });
 
-  it('declares Enthusiast / Professional values with signals', () => {
+  it('declares Enthusiast / Professional values with signals', async () => {
     // Session 3: subsection rewritten to point at upsert_customer; the
     // "Unknown" enum value was dropped — the server now defaults to
     // 'enthusiast' rather than leaving the column nullable.
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('**Enthusiast**');
     expect(out).toContain('**Professional**');
     expect(out).toContain('for my shop');
     expect(out).toContain('for my dealership');
   });
 
-  it('forbids asking the customer the classification question directly', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('forbids asking the customer the classification question directly', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('are you a professional or an enthusiast?');
     expect(out).toContain('internal\ncategorization, never customer-facing');
   });
 
-  it('directs the agent to upsert_customer with customer_type (replaces old send_quote_sms branch language)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('directs the agent to upsert_customer with customer_type (replaces old send_quote_sms branch language)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // New wording (Workstream J Session 3 — D34)
     expect(out).toContain('`upsert_customer` accepts a `customer_type` parameter');
     expect(out).toContain("defaults to `'enthusiast'`");
@@ -605,13 +647,13 @@ describe('buildV2SystemPrompt — Issue 18 (customer type classification) [revis
 });
 
 describe('buildV2SystemPrompt — Tool usage guide updates (Issue 17 + D19)', () => {
-  it('Tool usage guide directs product/catalog inquiries to get_products BEFORE asking customer for anything', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Tool usage guide directs product/catalog inquiries to get_products BEFORE asking customer for anything', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Call `get_products` or `get_product_details` BEFORE asking the customer for anything');
   });
 
-  it('Tool usage guide replaces the old "call create_appointment with confirmed date+time+service" bullet with the quote-first path', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Tool usage guide replaces the old "call create_appointment with confirmed date+time+service" bullet with the quote-first path', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Old bullet content must NOT remain unchanged — the quote-first replacement points to send_quote_sms.
     expect(out).toContain('This is the booking path — staff handles scheduling confirmation in a follow-up');
     expect(out).toContain('Do NOT call `create_appointment` directly');
@@ -623,51 +665,51 @@ describe('buildV2SystemPrompt — Tool usage guide updates (Issue 17 + D19)', ()
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () => {
-  it('includes "Capturing the customer\'s first name" subsection', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes "Capturing the customer\'s first name" subsection', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain("## Capturing the customer's first name");
   });
 
-  it('directs the agent to call upsert_customer IMMEDIATELY upon learning first_name', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('directs the agent to call upsert_customer IMMEDIATELY upon learning first_name', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('IMMEDIATELY call `upsert_customer`');
   });
 
-  it('declares one-polite-re-ask-then-proceed deflection rule', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares one-polite-re-ask-then-proceed deflection rule', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('After ONE polite\nre-ask, proceed without');
   });
 
-  it('includes "Using upsert_customer to enrich customer records" subsection', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes "Using upsert_customer to enrich customer records" subsection', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('## Using upsert_customer to enrich customer records');
   });
 
-  it('describes upsert_customer as idempotent in the enrichment subsection', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('describes upsert_customer as idempotent in the enrichment subsection', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('`upsert_customer` is idempotent');
   });
 
-  it('lists the "When NOT to call upsert_customer" cases (already in context, no name, just browsing)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('lists the "When NOT to call upsert_customer" cases (already in context, no name, just browsing)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('When NOT to call `upsert_customer`');
     expect(out).toContain('already in CUSTOMER CONTEXT');
     expect(out).toContain('just browsing');
   });
 
-  it('forbids passing placeholder values like "Customer" or "Caller" as first_name', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('forbids passing placeholder values like "Customer" or "Caller" as first_name', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Never pass\n  placeholder values like "Customer" or "Caller"');
   });
 
-  it('"For NEW conversations" step 1 now references upsert_customer call timing', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('"For NEW conversations" step 1 now references upsert_customer call timing', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // The updated step 1 wording — pinned literally so we catch silent regressions
     expect(out).toContain('The MOMENT the customer shares a usable first name, call `upsert_customer`');
   });
 
-  it('Customer type classification subsection now references upsert_customer (not send_quote_sms)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Customer type classification subsection now references upsert_customer (not send_quote_sms)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const ctIdx = out.indexOf('## Customer type classification');
     expect(ctIdx).toBeGreaterThan(-1);
     // Section ends at the next top-level header (e.g. `# Escalation guide`).
@@ -680,8 +722,8 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     expect(ctSection).not.toContain('If `send_quote_sms` tool accepts a `customer_type` parameter');
   });
 
-  it('Critical rule 22 declares instructions_for_agent silent-follow handling (was Rule 16 pre-D38; was Rule 17 pre-D39 size_class insert; was Rule 18 pre-D43 tier-intent insert; was Rule 19 pre-D47 scope-pricing inserts; was Rule 21 pre-D49 auto-send insert)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Critical rule 22 declares instructions_for_agent silent-follow handling (was Rule 16 pre-D38; was Rule 17 pre-D39 size_class insert; was Rule 18 pre-D43 tier-intent insert; was Rule 19 pre-D47 scope-pricing inserts; was Rule 21 pre-D49 auto-send insert)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Session 4 broadened "Tool errors" → "Tool responses" so the same rule
     // covers both isError:true error paths AND isError:false success paths
     // that ship a directive (e.g. send_quote_sms's was_duplicate:true case).
@@ -703,8 +745,8 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     expect(out).toContain('was_duplicate');
   });
 
-  it('upsert_customer subsections appear inside Discovery and conversation flow (before Escalation guide)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('upsert_customer subsections appear inside Discovery and conversation flow (before Escalation guide)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const flowIdx = out.indexOf('# Discovery and conversation flow');
     const captureIdx = out.indexOf("## Capturing the customer's first name");
     const enrichIdx = out.indexOf('## Using upsert_customer to enrich customer records');
@@ -717,8 +759,8 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
 });
 
 describe('buildV2SystemPrompt — section ordering (post-2026-05-23 outline)', () => {
-  it('Discovery and conversation flow subsections appear in expected order: Contact info → Vehicle info → Booking flow → Customer type', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Discovery and conversation flow subsections appear in expected order: Contact info → Vehicle info → Booking flow → Customer type', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const contactIdx = out.indexOf('## Contact information handling');
     const vehicleIdx = out.indexOf('## Vehicle information collection');
     const bookingIdx = out.indexOf('## Booking flow — quote first, scheduling second');
@@ -729,8 +771,8 @@ describe('buildV2SystemPrompt — section ordering (post-2026-05-23 outline)', (
     expect(bookingIdx).toBeLessThan(customerTypeIdx);
   });
 
-  it('All new 2026-05-23 subsections live inside their parent # sections', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('All new 2026-05-23 subsections live inside their parent # sections', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Contact / Vehicle / Booking / Customer-type live inside Discovery and conversation flow
     const flowIdx = out.indexOf('# Discovery and conversation flow');
     const escalIdx = out.indexOf('# Escalation guide');
@@ -753,23 +795,23 @@ describe('buildV2SystemPrompt — section ordering (post-2026-05-23 outline)', (
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — Workstream J Session 4 (D37 invocation discipline)', () => {
-  it('declares the no-new-fields-no-call rule under upsert_customer enrichment subsection', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares the no-new-fields-no-call rule under upsert_customer enrichment subsection', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('You already called `upsert_customer` earlier in this conversation');
     expect(out).toContain('200-400ms of latency');
     expect(out).toContain('ONLY call `upsert_customer` when you are\n  persisting NEW information');
   });
 
-  it('includes Invocation cadence guide with first/subsequent/no-fields branches', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes Invocation cadence guide with first/subsequent/no-fields branches', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Invocation cadence guide');
     expect(out).toContain('**First call**');
     expect(out).toContain('**Subsequent calls**');
     expect(out).toContain('**No new fields = no call.**');
   });
 
-  it('keeps the existing "When NOT to call" anchor bullets (back-compat with Session 3)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('keeps the existing "When NOT to call" anchor bullets (back-compat with Session 3)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Session 3 bullets must persist — Session 4 only APPENDED, did not delete
     expect(out).toContain('Customer is already in CUSTOMER CONTEXT');
     expect(out).toContain("You don't have a usable first name yet");
@@ -785,8 +827,8 @@ describe('buildV2SystemPrompt — Workstream J Session 4 (D37 invocation discipl
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — Issue 33 Layer 2 (size_class on get_services)', () => {
-  it('includes the new "Passing size_class to get_services after classify_vehicle" subsection inside # Add-ons and bundle quoting', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes the new "Passing size_class to get_services after classify_vehicle" subsection inside # Add-ons and bundle quoting', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('## Passing size_class to get_services after classify_vehicle');
     const addonIdx = out.indexOf('# Add-ons and bundle quoting');
     const sizeClassIdx = out.indexOf('## Passing size_class to get_services after classify_vehicle');
@@ -795,15 +837,15 @@ describe('buildV2SystemPrompt — Issue 33 Layer 2 (size_class on get_services)'
     expect(sizeClassIdx).toBeLessThan(discoveryIdx);
   });
 
-  it('directs the agent to pass size_class after classify_vehicle returns (D39 imperative wording)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('directs the agent to pass size_class after classify_vehicle returns (D39 imperative wording)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('classify_vehicle');
     // D39 strengthened "pass that same" → "you MUST pass that same".
     expect(out).toMatch(/you MUST pass that same `size_class` value to/);
   });
 
-  it('preserves the exotic/classic escalation reminder in the size_class subsection', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('preserves the exotic/classic escalation reminder in the size_class subsection', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const sizeClassIdx = out.indexOf('## Passing size_class to get_services after classify_vehicle');
     const nextSection = out.indexOf('# Discovery and conversation flow', sizeClassIdx);
     const section = out.slice(sizeClassIdx, nextSection);
@@ -812,30 +854,30 @@ describe('buildV2SystemPrompt — Issue 33 Layer 2 (size_class on get_services)'
     expect(section).toContain('custom_quote');
   });
 
-  it('DELETES the obsolete Session 4 combo-pricing-mitigation subsection (replaced by Layer 1 endpoint fix)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('DELETES the obsolete Session 4 combo-pricing-mitigation subsection (replaced by Layer 1 endpoint fix)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).not.toContain('## Combo and bundle pricing — confirm before stating');
     expect(out).not.toContain('Do NOT state combo/bundle pricing');
     expect(out).not.toContain('JUST called `get_services`');
   });
 
-  it('preserves Rule 22 (instructions_for_agent silent-follow) — untouched by Layer 2 (renumbered 16→17 by D38; 17→18 by D39; 18→19 by D43; 19→21 by D47; 21→22 by D49)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('preserves Rule 22 (instructions_for_agent silent-follow) — untouched by Layer 2 (renumbered 16→17 by D38; 17→18 by D39; 18→19 by D43; 19→21 by D47; 21→22 by D49)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/22\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('success OR error');
     expect(out).toContain('was_duplicate');
   });
 
-  it('preserves Critical rule 4 exotic/classic escalation (untouched by Layer 2; renumbered 3→4 by D38 Issue 35)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('preserves Critical rule 4 exotic/classic escalation (untouched by Layer 2; renumbered 3→4 by D38 Issue 35)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/4\.\s+\*\*Specialty vehicles require staff/);
     expect(out).toContain('"exotic" or "classic"');
   });
 });
 
 describe('buildV2SystemPrompt — Workstream J Session 4 (Issue 34 last_name capture at quote-send)', () => {
-  it('includes "Capturing the customer\'s last name at quote-send" subsection inside Discovery and conversation flow', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('includes "Capturing the customer\'s last name at quote-send" subsection inside Discovery and conversation flow', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain("## Capturing the customer's last name at quote-send");
     const flowIdx = out.indexOf('# Discovery and conversation flow');
     const lastNameIdx = out.indexOf("## Capturing the customer's last name at quote-send");
@@ -844,8 +886,8 @@ describe('buildV2SystemPrompt — Workstream J Session 4 (Issue 34 last_name cap
     expect(lastNameIdx).toBeLessThan(escalIdx);
   });
 
-  it('positions last_name capture between Booking flow and Customer type classification', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('positions last_name capture between Booking flow and Customer type classification', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const bookingIdx = out.indexOf('## Booking flow — quote first, scheduling second');
     const lastNameIdx = out.indexOf("## Capturing the customer's last name at quote-send");
     const customerTypeIdx = out.indexOf('## Customer type classification');
@@ -854,15 +896,15 @@ describe('buildV2SystemPrompt — Workstream J Session 4 (Issue 34 last_name cap
     expect(lastNameIdx).toBeLessThan(customerTypeIdx);
   });
 
-  it('declares the three response paths (just-last-name, full-name, declines)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares the three response paths (just-last-name, full-name, declines)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Just their last name');
     expect(out).toContain('Their full name');
     expect(out).toContain('First name only or declines');
   });
 
-  it('declares the aggressive full-name parsing rule (Q1 operator answer)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares the aggressive full-name parsing rule (Q1 operator answer)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Parse aggressively');
     expect(out).toContain('"Nayeem Khan"');
     expect(out).toContain('`last_name: "Khan"`');
@@ -870,15 +912,15 @@ describe('buildV2SystemPrompt — Workstream J Session 4 (Issue 34 last_name cap
     expect(out).toContain('preserved per\n   Policy B');
   });
 
-  it('declares non-blocking + no-re-ask rule', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares non-blocking + no-re-ask rule', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Do not block the quote on last_name capture');
     expect(out).toContain('Do NOT re-ask');
     expect(out).toContain("customer's choice is respected");
   });
 
-  it('uses casual ask wording — "What name should I put on the quote?" or "Last name?"', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('uses casual ask wording — "What name should I put on the quote?" or "Last name?"', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('"What name should I put on the quote?"');
     expect(out).toContain('"Last name?"');
   });
@@ -891,14 +933,14 @@ describe('buildV2SystemPrompt — Workstream J Session 4 (Issue 34 last_name cap
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing reply on every turn)', () => {
-  it('declares Critical rule 2 as the mandatory-reply rule with the distinctive headline phrase', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares Critical rule 2 as the mandatory-reply rule with the distinctive headline phrase', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // The new rule is the second numbered item under # Critical rules.
     expect(out).toMatch(/2\.\s+\*\*Every customer turn requires a customer-facing reply/);
   });
 
-  it('mandatory-reply rule appears WITHIN the # Critical rules section (high-priority placement)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('mandatory-reply rule appears WITHIN the # Critical rules section (high-priority placement)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx).toBeGreaterThan(-1);
     const ruleIdx = out.indexOf('Every customer turn requires a customer-facing reply', criticalIdx);
@@ -908,8 +950,8 @@ describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing repl
     expect(nextH1).toBeGreaterThan(ruleIdx);
   });
 
-  it('mandatory-reply rule explicitly names upsert_customer (the Issue 35 trigger tool)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('mandatory-reply rule explicitly names upsert_customer (the Issue 35 trigger tool)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -918,27 +960,27 @@ describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing repl
     expect(section).toMatch(/Tool calls[\s\S]*upsert_customer/);
   });
 
-  it('mandatory-reply rule classifies tool calls as INTERNAL ACTIONS, not replies', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('mandatory-reply rule classifies tool calls as INTERNAL ACTIONS, not replies', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('INTERNAL ACTIONS');
     expect(out).toContain('are NOT replies');
   });
 
-  it('mandatory-reply rule includes BOTH the WRONG (silent) and RIGHT (text + tool) example labels', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('mandatory-reply rule includes BOTH the WRONG (silent) and RIGHT (text + tool) example labels', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Verify the Issue 35 reproduction example uses Sarah / Camry shape
     expect(out).toContain("I'm Sarah with a 2020 Camry");
     expect(out).toContain('WRONG — silent after tool');
     expect(out).toContain('RIGHT — tool plus conversational reply');
   });
 
-  it('mandatory-reply rule asserts "Silence is never the right answer to a customer message"', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('mandatory-reply rule asserts "Silence is never the right answer to a customer message"', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('Silence is never the right answer to a customer message');
   });
 
-  it('mandatory-reply rule includes coexistence cross-reference to Rule 22 (instructions_for_agent)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('mandatory-reply rule includes coexistence cross-reference to Rule 22 (instructions_for_agent)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // D38 must explicitly call out that following instructions_for_agent
     // still satisfies the reply requirement (both rules satisfied).
     // Reference updated 17 → 18 by D39 (size_class rule insert at position 6),
@@ -948,8 +990,8 @@ describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing repl
     expect(out).toMatch(/When a tool response contains `instructions_for_agent`, follow it \(per Rule 22\)/);
   });
 
-  it('Rule 22 (was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47; was Rule 21 pre-D49) wording for instructions_for_agent is preserved unchanged in substance', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 22 (was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47; was Rule 21 pre-D49) wording for instructions_for_agent is preserved unchanged in substance', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Substantive wording must be intact — only the rule NUMBER changed
     // from 17 → 18 because D39 added a new Rule 6 (size_class imperative),
     // 18 → 19 because D43 added a new Rule 7 (tier intent), 19 → 21
@@ -961,8 +1003,8 @@ describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing repl
     expect(out).toContain('was_duplicate');
   });
 
-  it('D37 invocation discipline (When NOT to call upsert_customer) remains intact alongside D38', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('D37 invocation discipline (When NOT to call upsert_customer) remains intact alongside D38', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // D37 governs WHEN to call upsert_customer; D38 governs ALWAYS reply.
     // Both must coexist. Verify the D37-distinctive substrings are still present.
     expect(out).toContain('You already called `upsert_customer` earlier in this conversation');
@@ -970,8 +1012,8 @@ describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing repl
     expect(out).toContain('No new fields = no call');
   });
 
-  it('Critical rule 4 (exotic/classic escalation) language remains intact at every pinned site', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Critical rule 4 (exotic/classic escalation) language remains intact at every pinned site', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // The exotic/classic escalation lives at Critical rule 4 (was Rule 3
     // pre-D38) and is referenced from "Vehicle size mapping" and the
     // size_class-on-get_services subsection. Verify all three sites intact.
@@ -1000,15 +1042,15 @@ describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing repl
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_services)', () => {
-  it('declares Critical rule 6 with the CRITICAL — ALWAYS pass size_class headline', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares Critical rule 6 with the CRITICAL — ALWAYS pass size_class headline', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Rule 6 specifically — inserted by D39 between Rule 5 (Classify before
     // quoting) and the prior Rule 6 (now Rule 7 — appointment confirmation).
     expect(out).toMatch(/6\.\s+\*\*CRITICAL — ALWAYS pass `size_class` to `get_services` after `classify_vehicle`\.\*\*/);
   });
 
-  it('new Critical Rule 6 appears WITHIN the # Critical rules section (high-priority placement, top 6)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 6 appears WITHIN the # Critical rules section (high-priority placement, top 6)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx).toBeGreaterThan(-1);
     const ruleIdx = out.indexOf('CRITICAL — ALWAYS pass `size_class`', criticalIdx);
@@ -1022,8 +1064,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(rule5Idx).toBeLessThan(ruleIdx);
   });
 
-  it('new Critical Rule 6 references the empirical $300/$450 Suburban failure', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 6 references the empirical $300/$450 Suburban failure', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Pin the Q-0084-class empirical evidence so future edits can't silently
     // weaken the rule to abstract language.
     expect(out).toContain('2018 Suburban');
@@ -1033,8 +1075,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(out).toContain('$150 fidelity gap');
   });
 
-  it('new Critical Rule 6 names classify_vehicle as the trigger for passing size_class', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 6 names classify_vehicle as the trigger for passing size_class', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1046,8 +1088,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(rule6Body).toMatch(/Customer mentions a vehicle → call `classify_vehicle`/);
   });
 
-  it('new Critical Rule 6 declares the recall directive (cached response scenario)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 6 declares the recall directive (cached response scenario)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1059,8 +1101,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(rule6Body).toContain('cached');
   });
 
-  it('new Critical Rule 6 reinforces exotic/classic escalation precedence (Critical Rule 4)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 6 reinforces exotic/classic escalation precedence (Critical Rule 4)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1074,8 +1116,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(rule6Body).toMatch(/do NOT use `size_class='exotic'`/);
   });
 
-  it('"Passing size_class" subsection is strengthened with imperative wording (you MUST pass)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('"Passing size_class" subsection is strengthened with imperative wording (you MUST pass)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const sizeIdx = out.indexOf('## Passing size_class to get_services after classify_vehicle');
     expect(sizeIdx).toBeGreaterThan(-1);
     const sizeEnd = out.indexOf('\n# ', sizeIdx);
@@ -1086,8 +1128,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(subsection).toContain('Critical Rule 6');
   });
 
-  it('"Passing size_class" subsection cites the Q-0084-class fidelity gap example', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('"Passing size_class" subsection cites the Q-0084-class fidelity gap example', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const sizeIdx = out.indexOf('## Passing size_class to get_services after classify_vehicle');
     const sizeEnd = out.indexOf('\n# ', sizeIdx);
     const subsection = out.slice(sizeIdx, sizeEnd);
@@ -1099,8 +1141,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(subsection).toContain('Q-0084');
   });
 
-  it('"Passing size_class" subsection declares the Recall directive header + stale-cache language', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('"Passing size_class" subsection declares the Recall directive header + stale-cache language', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const sizeIdx = out.indexOf('## Passing size_class to get_services after classify_vehicle');
     const sizeEnd = out.indexOf('\n# ', sizeIdx);
     const subsection = out.slice(sizeIdx, sizeEnd);
@@ -1109,8 +1151,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(subsection).toContain('at most twice');
   });
 
-  it('"Passing size_class" subsection still cites Critical Rule 4 for exotic/classic precedence', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('"Passing size_class" subsection still cites Critical Rule 4 for exotic/classic precedence', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const sizeIdx = out.indexOf('## Passing size_class to get_services after classify_vehicle');
     const sizeEnd = out.indexOf('\n# ', sizeIdx);
     const subsection = out.slice(sizeIdx, sizeEnd);
@@ -1118,8 +1160,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(subsection).toContain('exotic and classic');
   });
 
-  it('D38 mandatory-reply rule (Rule 2) wording is preserved unchanged by D39', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('D38 mandatory-reply rule (Rule 2) wording is preserved unchanged by D39', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // D38's headline must remain at Rule 2 — D39 inserted at position 6,
     // not at position 2/3, so Rules 1-5 are untouched.
     expect(out).toMatch(/2\.\s+\*\*Every customer turn requires a customer-facing reply/);
@@ -1127,15 +1169,15 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(out).toContain('INTERNAL ACTIONS');
   });
 
-  it('Rule 22 (instructions_for_agent, was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47; was Rule 21 pre-D49) wording is preserved unchanged by D39+D43+D47+D49', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 22 (instructions_for_agent, was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47; was Rule 21 pre-D49) wording is preserved unchanged by D39+D43+D47+D49', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/22\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('was_duplicate');
   });
 
-  it('Critical rule 4 (exotic/classic escalation) language preserved at all 4 pinned sites', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Critical rule 4 (exotic/classic escalation) language preserved at all 4 pinned sites', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Site 1: Critical Rule 4 itself
     expect(out).toMatch(/4\.\s+\*\*Specialty vehicles require staff/);
     expect(out).toContain('"exotic" or "classic"');
@@ -1164,8 +1206,8 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send_quote_sms)', () => {
-  it('declares Critical rule 7 with the CRITICAL — Multi-tier services headline', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares Critical rule 7 with the CRITICAL — Multi-tier services headline', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Rule 7 specifically — inserted by D43 between Rule 6 (size_class) and
     // the prior Rule 7 (now Rule 8 — appointment confirmation).
     expect(out).toMatch(
@@ -1173,8 +1215,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     );
   });
 
-  it('new Critical Rule 7 appears WITHIN the # Critical rules section (top-tier placement, between size_class and appointment confirmation — appointment confirmation moved from Rule 8 → Rule 10 by D47)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 7 appears WITHIN the # Critical rules section (top-tier placement, between size_class and appointment confirmation — appointment confirmation moved from Rule 8 → Rule 10 by D47)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx).toBeGreaterThan(-1);
     // Must come AFTER Rule 6 (size_class) — pedagogical pairing
@@ -1191,8 +1233,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(nextH1).toBeGreaterThan(rule7Idx);
   });
 
-  it('new Critical Rule 7 references the empirical Q-0084 Hot Shampoo Per-Row failure', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 7 references the empirical Q-0084 Hot Shampoo Per-Row failure', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1208,8 +1250,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(rule7Body).toContain('Q-0084');
   });
 
-  it('new Critical Rule 7 names both Hot Shampoo Extraction tiers and Complete Motorcycle Detail tiers verbatim', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 7 names both Hot Shampoo Extraction tiers and Complete Motorcycle Detail tiers verbatim', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1227,8 +1269,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(rule7Body).toContain('touring_bagger');
   });
 
-  it('new Critical Rule 7 pins tier_name source as get_services with VERBATIM imperative', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 7 pins tier_name source as get_services with VERBATIM imperative', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1240,8 +1282,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(rule7Body).toContain('VERBATIM');
   });
 
-  it('new Critical Rule 7 declares parallel-array contract and empty-token / omit semantics', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 7 declares parallel-array contract and empty-token / omit semantics', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1255,8 +1297,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(rule7Body.toLowerCase()).toContain('auto-pick');
   });
 
-  it('new Critical Rule 7 declares max_qty rejection path with instructions_for_agent recovery', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 7 declares max_qty rejection path with instructions_for_agent recovery', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1271,8 +1313,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(rule7Body).toMatch(/Rule 22/);
   });
 
-  it('new Critical Rule 7 contains BOTH the WRONG ❌ and RIGHT ✅ exemplar pair', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 7 contains BOTH the WRONG ❌ and RIGHT ✅ exemplar pair', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1286,8 +1328,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(rule7Body).toContain('quantities: "2"');
   });
 
-  it('new Critical Rule 7 explicitly cross-references Critical Rule 6 (architectural parallel)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('new Critical Rule 7 explicitly cross-references Critical Rule 6 (architectural parallel)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const nextH1 = out.indexOf('\n# ', criticalIdx);
     const section = out.slice(criticalIdx, nextH1);
@@ -1300,8 +1342,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(rule7Body.toLowerCase()).toContain('parallel');
   });
 
-  it('D43 preserves Critical Rule 6 (size_class) wording unchanged', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('D43 preserves Critical Rule 6 (size_class) wording unchanged', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Rule 6's headline must remain at Rule 6 (D43 inserted at Rule 7, NOT
     // before Rule 6). The size_class empirical evidence must remain intact.
     expect(out).toMatch(/6\.\s+\*\*CRITICAL — ALWAYS pass `size_class` to `get_services` after `classify_vehicle`\.\*\*/);
@@ -1309,8 +1351,8 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(out).toContain('$150 fidelity gap');
   });
 
-  it('D49 preserves the tool-usage-guide cross-reference (now points to Rule 21 after D49 renumber)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('D49 preserves the tool-usage-guide cross-reference (now points to Rule 21 after D49 renumber)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // The "see Booking flow + Critical rule N" cross-refs in both the
     // Tool usage guide bullet and the "For NEW conversations" step 5
     // shifted from Rule 17 → Rule 18 by D43 (the quote-first rule
@@ -1336,13 +1378,13 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — D47 / Issue 43 (Critical Rule 8: price lookup, never price recall)', () => {
-  it('declares Critical Rule 8 with the CRITICAL — Price lookup headline', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares Critical Rule 8 with the CRITICAL — Price lookup headline', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/8\.\s+\*\*CRITICAL — Price lookup, never price recall\.\*\*/);
   });
 
-  it('Rule 8 appears WITHIN the # Critical rules section, between Rule 7 and Rule 9 (pricing-discipline cluster contiguous)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 8 appears WITHIN the # Critical rules section, between Rule 7 and Rule 9 (pricing-discipline cluster contiguous)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     const rule7Idx = out.indexOf('7. **CRITICAL — Multi-tier services', criticalIdx);
     const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup', criticalIdx);
@@ -1352,8 +1394,8 @@ describe('buildV2SystemPrompt — D47 / Issue 43 (Critical Rule 8: price lookup,
     expect(rule9Idx).toBeGreaterThan(rule8Idx);
   });
 
-  it('Rule 8 cites the Q-0087 empirical evidence (Express Exterior Wash $85 → $110 self-correction)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 8 cites the Q-0087 empirical evidence (Express Exterior Wash $85 → $110 self-correction)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule8Body = out.slice(rule8Idx, rule9Idx);
@@ -1363,8 +1405,8 @@ describe('buildV2SystemPrompt — D47 / Issue 43 (Critical Rule 8: price lookup,
     expect(rule8Body).toContain('$110');
   });
 
-  it('Rule 8 prescribes the LOOKUP-from-cached-response pattern + RECALL when stale', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 8 prescribes the LOOKUP-from-cached-response pattern + RECALL when stale', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule8Body = out.slice(rule8Idx, rule9Idx);
@@ -1373,8 +1415,8 @@ describe('buildV2SystemPrompt — D47 / Issue 43 (Critical Rule 8: price lookup,
     expect(rule8Body).toContain('RECALL');
   });
 
-  it('Rule 8 includes the WRONG ❌ / RIGHT ✅ exemplar pair for the recall trap', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 8 includes the WRONG ❌ / RIGHT ✅ exemplar pair for the recall trap', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule8Body = out.slice(rule8Idx, rule9Idx);
@@ -1382,8 +1424,8 @@ describe('buildV2SystemPrompt — D47 / Issue 43 (Critical Rule 8: price lookup,
     expect(rule8Body).toContain('✅ RIGHT');
   });
 
-  it('Rule 8 cross-references Rules 1, 6, 7 architecturally', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 8 cross-references Rules 1, 6, 7 architecturally', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule8Body = out.slice(rule8Idx, rule9Idx);
@@ -1393,13 +1435,13 @@ describe('buildV2SystemPrompt — D47 / Issue 43 (Critical Rule 8: price lookup,
 });
 
 describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing services enumerate tiers + probe + anchor)', () => {
-  it('declares Critical Rule 9 with the CRITICAL — Scope-pricing services headline', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares Critical Rule 9 with the CRITICAL — Scope-pricing services headline', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/9\.\s+\*\*CRITICAL — Scope-pricing services: enumerate tiers \+ probe \+ anchor on Complete\.\*\*/);
   });
 
-  it('Rule 9 appears WITHIN the # Critical rules section, between Rule 8 and Rule 10 (new appointment-confirmation slot)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 9 appears WITHIN the # Critical rules section, between Rule 8 and Rule 10 (new appointment-confirmation slot)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule10Idx = out.indexOf('10. **Never confirm an appointment');
@@ -1407,8 +1449,8 @@ describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing
     expect(rule10Idx).toBeGreaterThan(rule9Idx);
   });
 
-  it('Rule 9 mandates use of tier_label (not raw snake_case tier_name slugs) in agent prose', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 9 mandates use of tier_label (not raw snake_case tier_name slugs) in agent prose', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule10Idx = out.indexOf('10. **Never confirm an appointment');
     const rule9Body = out.slice(rule9Idx, rule10Idx);
@@ -1416,8 +1458,8 @@ describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing
     expect(rule9Body).toMatch(/never raw snake_case|NEVER raw snake_case/);
   });
 
-  it('Rule 9 lists ≥3 probe-phrasing examples so the agent can vary natural language', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 9 lists ≥3 probe-phrasing examples so the agent can vary natural language', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule10Idx = out.indexOf('10. **Never confirm an appointment');
     const rule9Body = out.slice(rule9Idx, rule10Idx);
@@ -1426,8 +1468,8 @@ describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing
     expect(rule9Body).toContain('while we\'re at it, anything else?');
   });
 
-  it('Rule 9 prescribes the Complete-anchor in flexible (not literal "best value") wording', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 9 prescribes the Complete-anchor in flexible (not literal "best value") wording', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule10Idx = out.indexOf('10. **Never confirm an appointment');
     const rule9Body = out.slice(rule9Idx, rule10Idx);
@@ -1435,8 +1477,8 @@ describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing
     expect(rule9Body).toMatch(/If you want everything covered|The whole interior|The all-in option/);
   });
 
-  it('Rule 9 cites the Q-0087 empirical evidence (Hot Shampoo per_row mention without sibling enumeration)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 9 cites the Q-0087 empirical evidence (Hot Shampoo per_row mention without sibling enumeration)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule10Idx = out.indexOf('10. **Never confirm an appointment');
     const rule9Body = out.slice(rule9Idx, rule10Idx);
@@ -1446,8 +1488,8 @@ describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing
     expect(rule9Body).toContain('Floor Mats');
   });
 
-  it('Rule 9 covers all 6 audit-Target-8 edge cases (direct / exploratory / operator-bypass / multi-service / vehicle pivot / Complete short-circuit)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 9 covers all 6 audit-Target-8 edge cases (direct / exploratory / operator-bypass / multi-service / vehicle pivot / Complete short-circuit)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule10Idx = out.indexOf('10. **Never confirm an appointment');
     const rule9Body = out.slice(rule9Idx, rule10Idx);
@@ -1459,8 +1501,8 @@ describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing
     expect(rule9Body).toContain('Complete-package short-circuit');
   });
 
-  it('Rule 9 cross-references Critical Rule 20 (architectural parallel — within-service vs cross-service enumeration; renumbered 19 → 20 by D49 auto-send insert at Rule 17)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 9 cross-references Critical Rule 20 (architectural parallel — within-service vs cross-service enumeration; renumbered 19 → 20 by D49 auto-send insert at Rule 17)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule10Idx = out.indexOf('10. **Never confirm an appointment');
     const rule9Body = out.slice(rule9Idx, rule10Idx);
@@ -1480,13 +1522,13 @@ describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send when configuration is finalized)', () => {
-  it('declares Critical Rule 17 with the CRITICAL — Auto-send quotes headline', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('declares Critical Rule 17 with the CRITICAL — Auto-send quotes headline', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toMatch(/17\.\s+\*\*CRITICAL — Auto-send quotes when configuration is finalized\.\*\*/);
   });
 
-  it('Rule 17 appears WITHIN the # Critical rules section, immediately after Rule 16 (Don\'t double-act) and before Rule 18 (Never pitch mobile)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 appears WITHIN the # Critical rules section, immediately after Rule 16 (Don\'t double-act) and before Rule 18 (Never pitch mobile)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx).toBeGreaterThan(-1);
     const rule16Idx = out.indexOf("16. **Don't double-act", criticalIdx);
@@ -1500,8 +1542,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(nextH1).toBeGreaterThan(rule17Idx);
   });
 
-  it('Rule 17 declares all THREE auto-send preconditions (commit signal + total stated + no mid-flux)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 declares all THREE auto-send preconditions (commit signal + total stated + no mid-flux)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1516,8 +1558,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(rule17Body).toContain('negation');
   });
 
-  it('Rule 17 specifies the exact auto-send reply phrasing "Sending the quote now — check your texts!"', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 specifies the exact auto-send reply phrasing "Sending the quote now — check your texts!"', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1527,8 +1569,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(rule17Body).toContain('tool-result-agnostic');
   });
 
-  it('Rule 17 contains the Pattern 3 example (conditional commitment with trailing change-request → recompute then auto-fire)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 contains the Pattern 3 example (conditional commitment with trailing change-request → recompute then auto-fire)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1541,8 +1583,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(rule17Body).toContain('recompute');
   });
 
-  it('Rule 17 contains the Issue 27 safety clause (post-failure correction, no fabrication)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 contains the Issue 27 safety clause (post-failure correction, no fabrication)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1552,8 +1594,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(rule17Body).toContain('Do NOT fabricate success');
   });
 
-  it('Rule 17 explicitly forbids the "Want me to send a quote?" question (friction step deletion)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 explicitly forbids the "Want me to send a quote?" question (friction step deletion)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1566,8 +1608,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(rule17Body).toContain('friction step is deleted');
   });
 
-  it('Rule 17 cross-references Rule 16 (architectural parallel — Rule 16 governs firing rate, Rule 17 governs trigger timing)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 cross-references Rule 16 (architectural parallel — Rule 16 governs firing rate, Rule 17 governs trigger timing)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1575,8 +1617,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(rule17Body).toContain('Rule 16');
   });
 
-  it('Rule 2 ✅ RIGHT example uses the new Rule 17 auto-send phrasing ("Sending the quote now — check your texts!"); past-tense "Quote sent!" removed', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 2 ✅ RIGHT example uses the new Rule 17 auto-send phrasing ("Sending the quote now — check your texts!"); past-tense "Quote sent!" removed', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Locate Rule 2 body
     const rule2Idx = out.indexOf('2. **Every customer turn requires a customer-facing reply');
     const rule3Idx = out.indexOf('3. **One primary service per quote');
@@ -1590,16 +1632,16 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(rule2Body).toContain('Cool, send it');
   });
 
-  it('Tool usage guide trigger references Critical Rule 17 (configuration-finalized framing) instead of customer-agreed framing', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Tool usage guide trigger references Critical Rule 17 (configuration-finalized framing) instead of customer-agreed framing', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // The tool-usage-guide bullet's framing now keys on Rule 17 preconditions
     expect(out).toContain("Customer's configuration is finalized (commit signal + total stated in your prior turn + no mid-flux signals — per Critical Rule 17)?");
     // Old "Customer agreed on a service" framing removed
     expect(out).not.toContain("Customer agreed on a service (any \"yes book it\" / \"let's do it\" / \"sounds good\" agreement after price)?");
   });
 
-  it('Booking flow Step 1 references Critical Rule 17 preconditions (and explicitly forbids the friction question)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Booking flow Step 1 references Critical Rule 17 preconditions (and explicitly forbids the friction question)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const bookingIdx = out.indexOf('## Booking flow — quote first, scheduling second');
     expect(bookingIdx).toBeGreaterThan(-1);
     const nextH2 = out.indexOf('\n## ', bookingIdx + '## Booking flow — quote first, scheduling second'.length);
@@ -1610,8 +1652,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(bookingSection).not.toContain('Customer agrees to service ("Yes book it" / "Sounds good" / "Let\'s\n   do it"). You have the price, vehicle, color, name in context.');
   });
 
-  it('Quote-send intent recognition paragraph preserved (still documents commit phrasings) AND adds Rule 17 framing', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Quote-send intent recognition paragraph preserved (still documents commit phrasings) AND adds Rule 17 framing', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Original explicit-phrase examples preserved
     expect(out).toContain('send me the quote');
     expect(out).toContain('me puedes mandar un quote');
@@ -1622,8 +1664,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     expect(out).toContain('total stated in your prior turn AND no mid-flux');
   });
 
-  it('No "Want me to send a quote?" question anywhere except inside Rule 17 (which FORBIDS it) and Booking flow Step 1 (which references the prohibition)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('No "Want me to send a quote?" question anywhere except inside Rule 17 (which FORBIDS it) and Booking flow Step 1 (which references the prohibition)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Locate every match
     const matches = [...out.matchAll(/Want me to send a quote\?/g)];
     // Every match must be inside a forbidding context — count is small
@@ -1640,8 +1682,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     }
   });
 
-  it('Total Critical Rules count is now 22 (was 21 pre-D49)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Total Critical Rules count is now 22 (was 21 pre-D49)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx).toBeGreaterThan(-1);
     const nextH1 = out.indexOf('\n# ', criticalIdx + '# Critical rules'.length);
@@ -1670,8 +1712,8 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
 // ---------------------------------------------------------------------------
 
 describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibition of friction question)', () => {
-  it('Rule 17 contains the universal-scope prohibition clause ("in ANY conversational position")', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 contains the universal-scope prohibition clause ("in ANY conversational position")', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1680,8 +1722,8 @@ describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibitio
     expect(rule17Body).toContain('The friction step is deleted from the agent\'s repertoire entirely');
   });
 
-  it('Rule 17 contains the two-path framing (Preconditions met / Preconditions NOT met)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 contains the two-path framing (Preconditions met / Preconditions NOT met)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1693,8 +1735,8 @@ describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibitio
     expect(rule17Body).toContain('Do NOT elicit permission to send a quote');
   });
 
-  it('Rule 17 contains the ❌ WRONG discovery-phase friction-question anti-pattern (operator\'s 2026-05-27 D49 verification reproduction)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 contains the ❌ WRONG discovery-phase friction-question anti-pattern (operator\'s 2026-05-27 D49 verification reproduction)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1708,8 +1750,8 @@ describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibitio
     expect(rule17Body).toContain('wastes a turn');
   });
 
-  it('Rule 17 contains the ✅ RIGHT discovery-phase counterpart (present pricing + add-on, no permission ask)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 contains the ✅ RIGHT discovery-phase counterpart (present pricing + add-on, no permission ask)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1720,8 +1762,8 @@ describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibitio
     expect(rule17Body).toContain('agent auto-fires when commitment arrives');
   });
 
-  it('Rule 17 explicitly states the customer commitment "will arrive naturally as they engage" (no permission-elicitation needed)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 17 explicitly states the customer commitment "will arrive naturally as they engage" (no permission-elicitation needed)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
     const rule18Idx = out.indexOf('18. **Never pitch mobile service');
     const rule17Body = out.slice(rule17Idx, rule18Idx);
@@ -1729,8 +1771,8 @@ describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibitio
     expect(rule17Body).toContain("You don't need to ASK for it");
   });
 
-  it('Rule 20 add-on example refactored: "if you want" → "if you\'d like to add it" (D50 Refactor A; removes pattern-matchable permission-ask hook)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Rule 20 add-on example refactored: "if you want" → "if you\'d like to add it" (D50 Refactor A; removes pattern-matchable permission-ask hook)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // Locate the "When configured, surface proactively" bullet within
     // # Add-ons and bundle quoting
     const addonIdx = out.indexOf('# Add-ons and bundle quoting');
@@ -1744,8 +1786,8 @@ describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibitio
     expect(addonSection).toContain('Critical Rule 17 forbids');
   });
 
-  it('Friction question variant "Want me to send you a quote?" appears ONLY in forbidding contexts (Rule 17 ❌ WRONG example + Rule 20 refactor explanation)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Friction question variant "Want me to send you a quote?" appears ONLY in forbidding contexts (Rule 17 ❌ WRONG example + Rule 20 refactor explanation)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // The "send you a quote" variant (with explicit "you") — distinct from
     // the canonical "send a quote" form covered by the D49 pin
     const matches = [...out.matchAll(/Want me to send you a quote\?/g)];
@@ -1765,8 +1807,8 @@ describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibitio
     }
   });
 
-  it('Canonical friction question "Want me to send a quote?" still appears in only-forbidding contexts after D50 (D49 invariant preserved; count = 3 unchanged: Rule 17 first prohibition + Rule 17 universal clause + Booking flow Step 1)', () => {
-    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+  it('Canonical friction question "Want me to send a quote?" still appears in only-forbidding contexts after D50 (D49 invariant preserved; count = 3 unchanged: Rule 17 first prohibition + Rule 17 universal clause + Booking flow Step 1)', async () => {
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
     // D49 pinned count=3 for the canonical form. D50 added a SECOND
     // sentence to Rule 17 (universal clause) that re-uses the canonical
     // form, AND added a ❌ WRONG example that uses the variant "send you
@@ -1783,5 +1825,124 @@ describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibitio
         /NOT ask|NEVER ask|forbidden|forbidden by|deleted from/i.test(context);
       expect(forbids).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase C (Workstream A Layer 5, 2026-06-18) — getStandardTemplate +
+// buildV2SystemPrompt DB-first / hardcoded-fallback contract.
+// ---------------------------------------------------------------------------
+
+describe('getStandardTemplate — canonical hardcoded body', () => {
+  it('returns a pure string with no DB or async work', () => {
+    const out = getStandardTemplate();
+    expect(typeof out).toBe('string');
+    // The body is large (50KB-class) and contains the # Identity opener.
+    expect(out.length).toBeGreaterThan(20_000);
+    expect(out.startsWith('# Identity\n')).toBe(true);
+  });
+
+  it('contains the four placeholder tokens UN-substituted', () => {
+    const out = getStandardTemplate();
+    // The body MUST carry placeholder tokens — buildV2SystemPrompt substitutes
+    // the first three; the Layer 3 runner substitutes {CUSTOMER_CONTEXT}.
+    expect(out).toContain(BUSINESS_NAME_PLACEHOLDER);
+    expect(out).toContain(BUSINESS_HOURS_PLACEHOLDER);
+    expect(out).toContain(CURRENT_DATE_PLACEHOLDER);
+    expect(out).toContain(CUSTOMER_CONTEXT_PLACEHOLDER);
+  });
+
+  it('is the same byte content used by buildV2SystemPrompt fallback (modulo grounding substitution)', async () => {
+    // DB returns null → buildV2SystemPrompt MUST use getStandardTemplate() as
+    // the template, then apply grounding substitutions. The substituted
+    // output should equal `template.replaceAll(...)`.
+    messagingAiInstructionsValue.value = null;
+    const built = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    const template = getStandardTemplate();
+    const expected = template
+      .split(BUSINESS_NAME_PLACEHOLDER).join(SAMPLE_INPUTS.businessName)
+      .split(BUSINESS_HOURS_PLACEHOLDER).join(SAMPLE_INPUTS.businessHours)
+      .split(CURRENT_DATE_PLACEHOLDER).join(SAMPLE_INPUTS.currentDate);
+    expect(built).toBe(expected);
+  });
+});
+
+describe('buildV2SystemPrompt — DB-source path (Phase C)', () => {
+  it('reads from business_settings.messaging_ai_instructions when set (non-empty string)', async () => {
+    // Custom DB body that omits the standard prompt content entirely — proves
+    // the DB value is the source, not the hardcoded fallback.
+    const customBody = `# Custom prompt for testing\nBusiness: ${BUSINESS_NAME_PLACEHOLDER}\nHours: ${BUSINESS_HOURS_PLACEHOLDER}\nDate: ${CURRENT_DATE_PLACEHOLDER}\nCtx:\n${CUSTOMER_CONTEXT_PLACEHOLDER}`;
+    messagingAiInstructionsValue.value = customBody;
+
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Custom body appears (with substitutions).
+    expect(out).toContain('# Custom prompt for testing');
+    expect(out).toContain(`Business: ${SAMPLE_INPUTS.businessName}`);
+    expect(out).toContain(`Hours: ${SAMPLE_INPUTS.businessHours}`);
+    expect(out).toContain(`Date: ${SAMPLE_INPUTS.currentDate}`);
+    // {CUSTOMER_CONTEXT} stays UN-substituted (filled by Layer 3 runner).
+    expect(out).toContain(CUSTOMER_CONTEXT_PLACEHOLDER);
+    // Standard template's content is NOT present (custom body wins).
+    expect(out).not.toContain('You are Tom, the SMS assistant');
+  });
+
+  it('falls back to getStandardTemplate when DB row is null', async () => {
+    messagingAiInstructionsValue.value = null;
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Standard template signature line is present.
+    expect(out).toContain('You are Tom, the SMS assistant');
+  });
+
+  it('falls back when DB value is an empty string', async () => {
+    messagingAiInstructionsValue.value = '';
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('You are Tom, the SMS assistant');
+  });
+
+  it('falls back when DB value is whitespace only', async () => {
+    messagingAiInstructionsValue.value = '   \n\t  \n';
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('You are Tom, the SMS assistant');
+  });
+
+  it('falls back when supabase returns an error', async () => {
+    messagingAiInstructionsValue.error = { message: 'simulated DB outage' };
+    const out = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('You are Tom, the SMS assistant');
+  });
+
+  it('applies grounding substitutions identically on DB-source and fallback paths', async () => {
+    // First: DB-set custom body
+    messagingAiInstructionsValue.value =
+      `BIZ=${BUSINESS_NAME_PLACEHOLDER} HRS=${BUSINESS_HOURS_PLACEHOLDER} DATE=${CURRENT_DATE_PLACEHOLDER}`;
+    const fromDb = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(fromDb).toBe(
+      `BIZ=${SAMPLE_INPUTS.businessName} HRS=${SAMPLE_INPUTS.businessHours} DATE=${SAMPLE_INPUTS.currentDate}`,
+    );
+
+    // Then: fallback path — both substitutions still apply.
+    messagingAiInstructionsValue.value = null;
+    const fromFallback = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(fromFallback).toContain(SAMPLE_INPUTS.businessName);
+    expect(fromFallback).toContain(SAMPLE_INPUTS.businessHours);
+    expect(fromFallback).toContain(SAMPLE_INPUTS.currentDate);
+    // Placeholder tokens NOT present in the final output (other than
+    // {CUSTOMER_CONTEXT} which stays for the runner).
+    expect(fromFallback).not.toContain(BUSINESS_NAME_PLACEHOLDER);
+    expect(fromFallback).not.toContain(BUSINESS_HOURS_PLACEHOLDER);
+    expect(fromFallback).not.toContain(CURRENT_DATE_PLACEHOLDER);
+    expect(fromFallback).toContain(CUSTOMER_CONTEXT_PLACEHOLDER);
+  });
+
+  it('preserves the {CUSTOMER_CONTEXT} placeholder on both source paths (runner substitutes later)', async () => {
+    // DB body that explicitly includes the placeholder
+    messagingAiInstructionsValue.value =
+      `Top\n${CUSTOMER_CONTEXT_PLACEHOLDER}\nBot`;
+    const fromDb = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(fromDb).toContain(CUSTOMER_CONTEXT_PLACEHOLDER);
+
+    messagingAiInstructionsValue.value = null;
+    const fromFallback = await buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(fromFallback).toContain(CUSTOMER_CONTEXT_PLACEHOLDER);
   });
 });

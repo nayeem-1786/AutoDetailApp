@@ -1,9 +1,11 @@
 # SMS AI Auto-Reply Pipeline — Audit
 
 **Date:** 2026-05-19
-**Scope:** Inbound Twilio SMS → AI auto-reply pipeline
+**Scope:** Inbound Twilio SMS → AI auto-reply pipeline (v1 single-shot responder)
 **Trigger:** Two production symptoms reported after Anthropic API key rotation (Fix #1)
 **Status:** Audit-only. **No code was modified.** Fix path is recommended but blocked on user review.
+
+> **2026-06-18 update — Phase C eradicated v1.** The single-shot responder (`getAIResponse()` in `src/lib/services/messaging-ai.ts`) and its prompt source (`getDefaultSystemPrompt()` in `src/lib/services/messaging-ai-prompt.ts`) were deleted in Workstream A Layer 5 Phase C. SMS AI v2 (agent runner in `src/lib/sms-ai/`) is the sole AI path. The specialty-pivot gate in `route.ts:612-674` (the §1 root cause below) was deleted as part of the same cleanup. The admin textarea ↔ runtime prompt-source mismatch surfaced in §10 was closed — `buildV2SystemPrompt` now reads from `business_settings.messaging_ai_instructions` first and falls back to a hardcoded `getStandardTemplate()` in `src/lib/sms-ai/system-prompt.ts`. The findings below are preserved as historical record; the file paths and line numbers no longer resolve in main.
 
 ---
 

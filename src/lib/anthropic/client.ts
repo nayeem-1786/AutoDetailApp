@@ -2,10 +2,10 @@
  * Anthropic SDK thin client wrapper.
  *
  * One place for SDK construction so future migrations of the existing
- * direct-`fetch` call sites (messaging-ai, conversation-summary,
- * ai-content-writer, ai-seo, ai-product-enrichment, ai-draft, etc.) can
- * pick up centralized config (env, future retry/timeout policy) without
- * each site rolling its own `new Anthropic({...})`.
+ * direct-`fetch` call sites (conversation-summary, ai-content-writer,
+ * ai-seo, ai-product-enrichment, ai-draft, etc.) can pick up centralized
+ * config (env, future retry/timeout policy) without each site rolling
+ * its own `new Anthropic({...})`.
  *
  * Current consumers:
  *   - SMS AI v2 agent runner (Layer 3a) — `@/lib/sms-ai/agent-runner`.

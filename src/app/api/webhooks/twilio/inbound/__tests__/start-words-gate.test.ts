@@ -43,10 +43,10 @@ vi.mock('@/lib/sms-ai/background-dispatch', () => ({
   runV2AgentInBackground: (input: unknown) => runV2AgentInBackgroundMock(input),
 }));
 
-const getAIResponseMock = vi.fn();
-vi.mock('@/lib/services/messaging-ai', () => ({
-  getAIResponse: (...args: unknown[]) => getAIResponseMock(...args),
-}));
+// Phase C (Workstream A Layer 5, 2026-06-18) — `@/lib/services/messaging-ai`
+// was deleted (v1 single-shot responder retired). Tests no longer need to
+// mock `getAIResponse`. v2 routing → `runV2AgentInBackground` is the sole
+// agent invocation point; `inboundV2Routed()` below remains the contract.
 
 const isFeatureEnabledMock = vi.fn();
 vi.mock('@/lib/utils/feature-flags', () => ({
@@ -64,28 +64,6 @@ vi.mock('@/lib/data/business-hours', () => ({
 
 vi.mock('@/lib/utils/sms', () => ({
   sendSms: vi.fn(async () => ({ success: true, sid: 'SMxxx' })),
-  splitSmsMessage: (msg: string) => [msg],
-}));
-
-vi.mock('@/lib/sms/render-sms-template', () => ({
-  renderSmsTemplate: vi.fn(async () => ({ isActive: false, body: '' })),
-}));
-
-vi.mock('@/lib/services/job-addons', () => ({
-  extractAddonActions: vi.fn(() => ({ authorizeIds: [], declineIds: [], cleanedMessage: '' })),
-  approveAddon: vi.fn(),
-  declineAddon: vi.fn(),
-}));
-
-vi.mock('@/lib/quotes/quote-service', () => ({ createQuote: vi.fn() }));
-vi.mock('@/lib/utils/short-link', () => ({ createShortLink: vi.fn() }));
-vi.mock('@/lib/utils/vehicle-helpers', () => ({
-  cleanVehicleDescription: () => '',
-  findOrCreateVehicle: vi.fn(),
-}));
-vi.mock('@/lib/services/service-resolver', () => ({
-  resolveServiceByName: vi.fn(),
-  resolvePrice: vi.fn(),
 }));
 
 vi.mock('@/lib/utils/format', () => ({
@@ -263,7 +241,6 @@ beforeEach(() => {
   loadSmsAiV2FlagsMock.mockReset();
   shouldUseSmsAiV2Mock.mockReset();
   runV2AgentInBackgroundMock.mockReset();
-  getAIResponseMock.mockReset();
   isFeatureEnabledMock.mockReset();
 
   isFeatureEnabledMock.mockResolvedValue(true);

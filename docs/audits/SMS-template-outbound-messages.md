@@ -4,6 +4,8 @@
 > **Scope:** Every outbound SMS message sent by the application
 > **Status:** Read-only audit — no code changes
 
+> **2026-06-18 update — Phase C eradicated SMS AI v1.** The "AI auto-reply" row (#21 in the catalog below) referenced the v1 single-shot responder at `api/webhooks/twilio/inbound/route.ts:849` — that line number no longer exists; v1 was deleted in Workstream A Layer 5 Phase C. The current AI auto-reply path lives in `src/lib/sms-ai/` (agent runner + tool dispatcher + background dispatch); outbound chunks are sent from `src/lib/sms-ai/background-dispatch.ts`. The expired-addon AUTHORIZE/DECLINE rows (#19, #20) — also formerly in the webhook route — are now driven by `src/lib/sms-ai/tool-dispatcher.ts` when v2 invokes `approve_addon` / `decline_addon` on a stale UUID, OR by the web-page endpoints at `/api/authorize/[token]/{approve,decline}/route.ts`. Catalog row line numbers in this table are pre-Phase-C historical references.
+
 ---
 
 ## SMS Sending Utilities

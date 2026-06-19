@@ -1,18 +1,18 @@
 /**
  * SMS AI v2 Layer 4 — Twilio inbound webhook routing decision tests.
  *
- * Exercises the routing branch inside the legacy webhook POST handler.
- * The branch sits after all existing gates (signature, STOP, two_way_sms,
- * is_ai_enabled per-conversation, audience flag, rate-limit) and BEFORE
- * the legacy 5-query context block. v2-allowlisted phones short-circuit
- * the request with an empty TwiML 200 and fire the agent in background;
- * non-allowlisted phones fall through to the legacy code path unchanged.
+ * Phase C update (Workstream A Layer 5, 2026-06-18): the v1 legacy
+ * single-shot responder was deleted from the webhook. v2 is now the SOLE
+ * AI path. The kill-switch / shouldUseSmsAiV2=false case (previously "fall
+ * through to legacy") now drops the AI reply entirely — the customer's
+ * inbound is stored, no agent fires. This file tests the post-Phase-C
+ * branching: when v2 fires, when v2 does NOT fire (and no fallback exists).
  *
- * Strategy: mock every external boundary the route touches, drive the
- * POST handler with a forged Twilio form-data request, observe which AI
- * path was taken via `getAIResponse` (legacy) vs `runV2AgentInBackground`
- * (v2) mocks. Most route internals are exercised by the existing legacy
- * code path; this file isolates the routing concern.
+ * The routing branch sits after all existing gates (signature, STOP,
+ * two_way_sms, is_ai_enabled per-conversation, audience flag, rate-limit).
+ * Strategy: mock every external boundary the route touches, drive POST with
+ * a forged Twilio form-data request, observe whether `runV2AgentInBackground`
+ * was called (v2 fires) or not (no AI reply).
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -33,10 +33,7 @@ vi.mock('@/lib/sms-ai/background-dispatch', () => ({
   runV2AgentInBackground: (input: unknown) => runV2AgentInBackgroundMock(input),
 }));
 
-const getAIResponseMock = vi.fn();
-vi.mock('@/lib/services/messaging-ai', () => ({
-  getAIResponse: (...args: unknown[]) => getAIResponseMock(...args),
-}));
+// Phase C — `@/lib/services/messaging-ai` deleted; no `getAIResponse` mock.
 
 // Feature-flag check for two_way_sms.
 const isFeatureEnabledMock = vi.fn();
@@ -63,35 +60,6 @@ vi.mock('@/lib/utils/sms-consent', () => ({
 
 vi.mock('@/lib/utils/sms', () => ({
   sendSms: vi.fn(async () => ({ success: true, sid: 'SMxxx' })),
-  splitSmsMessage: (msg: string) => [msg],
-}));
-
-vi.mock('@/lib/sms/render-sms-template', () => ({
-  renderSmsTemplate: vi.fn(async () => ({ isActive: false, body: '' })),
-}));
-
-vi.mock('@/lib/services/job-addons', () => ({
-  extractAddonActions: vi.fn(() => ({ authorizeIds: [], declineIds: [], cleanedMessage: '' })),
-  approveAddon: vi.fn(),
-  declineAddon: vi.fn(),
-}));
-
-vi.mock('@/lib/quotes/quote-service', () => ({
-  createQuote: vi.fn(),
-}));
-
-vi.mock('@/lib/utils/short-link', () => ({
-  createShortLink: vi.fn(),
-}));
-
-vi.mock('@/lib/utils/vehicle-helpers', () => ({
-  cleanVehicleDescription: () => '',
-  findOrCreateVehicle: vi.fn(),
-}));
-
-vi.mock('@/lib/services/service-resolver', () => ({
-  resolveServiceByName: vi.fn(),
-  resolvePrice: vi.fn(),
 }));
 
 vi.mock('@/lib/utils/format', () => ({
@@ -122,10 +90,6 @@ interface AdminFixture {
   } | null;
   settings: Record<string, string>;
   recentAiCount: number;
-  // History returned by the "messages" SELECT inside the AI branch
-  history: Array<Record<string, unknown>>;
-  // Customer-row + transactions/vehicles/appointments/quotes for legacy ctx
-  customerProfile: Record<string, unknown> | null;
 }
 
 const fixture: AdminFixture = {
@@ -133,8 +97,6 @@ const fixture: AdminFixture = {
   conversation: null,
   settings: {},
   recentAiCount: 0,
-  history: [],
-  customerProfile: null,
 };
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -202,7 +164,7 @@ function buildAdminMock() {
           gte() { return proxy; },
           order() { return proxy; },
           limit() {
-            return Promise.resolve({ data: fixture.history, error: null });
+            return Promise.resolve({ data: [], error: null });
           },
           insert: () => Promise.resolve({ data: null, error: null }),
           // Resolve await-of-builder when used as a count query
@@ -210,7 +172,7 @@ function buildAdminMock() {
             if (chain._isAiCount) {
               resolve({ count: fixture.recentAiCount, data: null, error: null });
             } else {
-              resolve({ data: fixture.history, error: null });
+              resolve({ data: [], error: null });
             }
           },
         };
@@ -233,37 +195,6 @@ function buildAdminMock() {
         };
         return chain;
       }
-      if (table === 'vehicles') {
-        // Specialty vehicle check returns nothing → not specialty
-        return {
-          select: () => ({
-            eq: () => ({
-              in: () => ({
-                limit: () => ({
-                  maybeSingle: () => Promise.resolve({ data: null, error: null }),
-                }),
-                order: () => Promise.resolve({ data: [], error: null }),
-              }),
-              order: () => Promise.resolve({ data: [], error: null }),
-            }),
-          }),
-        };
-      }
-      if (table === 'transactions') {
-        return {
-          select: () => ({ eq: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }) }),
-        };
-      }
-      if (table === 'appointments') {
-        return {
-          select: () => ({ eq: () => ({ gte: () => ({ neq: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }) }) }) }),
-        };
-      }
-      if (table === 'quotes') {
-        return {
-          select: () => ({ eq: () => ({ is: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }) }) }),
-        };
-      }
       throw new Error(`Unexpected supabase table in test: ${table}`);
     },
   };
@@ -282,19 +213,17 @@ function makeRequest(formData: Record<string, string>): import('next/server').Ne
 }
 
 const INBOUND_BODY = 'how much for a wax on my Camry?';
-const ALLOWLIST_PHONE = '+14245551234';
-const NON_ALLOWLIST_PHONE = '+14245559999';
+const PHONE_A = '+14245551234';
+const PHONE_B = '+14245559999';
 
 beforeEach(() => {
   loadSmsAiV2FlagsMock.mockReset();
   shouldUseSmsAiV2Mock.mockReset();
   runV2AgentInBackgroundMock.mockReset();
-  getAIResponseMock.mockReset();
   isFeatureEnabledMock.mockReset();
 
   // Defaults: two_way_sms enabled, audience-customers enabled, conversation
-  // ai-enabled, no rate-limit hit, no specialty vehicles. Per-test overrides
-  // tighten or loosen as needed.
+  // ai-enabled, no rate-limit hit. Per-test overrides tighten as needed.
   isFeatureEnabledMock.mockResolvedValue(true);
   fixture.customer = { id: 'cust-1' };
   fixture.conversation = {
@@ -312,14 +241,13 @@ beforeEach(() => {
     messaging_ai_customers_enabled: 'true',
   };
   fixture.recentAiCount = 0;
-  fixture.history = [];
-  fixture.customerProfile = null;
 
-  // Default v2 routing: kill switch off, globally disabled, allowlist of one
+  // Default v2 routing: kill switch off, globally enabled (post-Phase-A
+  // production state — verified pre-Phase-C). Both phones route to v2.
   loadSmsAiV2FlagsMock.mockResolvedValue({
     killSwitch: false,
-    enabledPhones: [ALLOWLIST_PHONE],
-    globallyEnabled: false,
+    enabledPhones: [],
+    globallyEnabled: true,
   });
   // Simulate the real predicate for tests that don't override
   shouldUseSmsAiV2Mock.mockImplementation((phone: string, flags: { killSwitch: boolean; enabledPhones: string[]; globallyEnabled: boolean }) => {
@@ -328,7 +256,6 @@ beforeEach(() => {
     return flags.enabledPhones.includes(phone);
   });
 
-  getAIResponseMock.mockResolvedValue(null);
   runV2AgentInBackgroundMock.mockResolvedValue(undefined);
 
   // Skip Twilio signature validation (route checks NODE_ENV === 'development').
@@ -345,10 +272,10 @@ async function callPOST(formData: Record<string, string>): Promise<Response> {
 
 // ---- tests ---------------------------------------------------------------
 
-describe('Twilio inbound webhook — v2 routing decision', () => {
-  it('allowlisted phone + flags default → routes to v2 (background dispatch fired, legacy NOT called)', async () => {
+describe('Twilio inbound webhook — v2 routing decision (post-Phase-C: v2 is the sole AI path)', () => {
+  it('globally enabled (default) → any phone routes to v2 (background dispatch fired)', async () => {
     const res = await callPOST({
-      From: ALLOWLIST_PHONE,
+      From: PHONE_A,
       Body: INBOUND_BODY,
       MessageSid: 'SM_test_1',
     });
@@ -358,13 +285,12 @@ describe('Twilio inbound webhook — v2 routing decision', () => {
     expect(runV2AgentInBackgroundMock).toHaveBeenCalledWith({
       inboundMessageBody: INBOUND_BODY,
       conversationId: 'conv-1',
-      phone: ALLOWLIST_PHONE,
+      phone: PHONE_A,
     });
-    expect(getAIResponseMock).not.toHaveBeenCalled();
   });
 
-  it('non-allowlisted phone + flags default → routes to legacy (getAIResponse called, v2 NOT called)', async () => {
-    // Re-point customer + conversation to the non-allowlisted phone
+  it('globally enabled (default) → second phone also routes to v2 (no allowlist gate)', async () => {
+    // Re-point customer + conversation to a different phone — same routing.
     fixture.conversation = {
       id: 'conv-2',
       customer_id: 'cust-1',
@@ -373,67 +299,83 @@ describe('Twilio inbound webhook — v2 routing decision', () => {
     };
 
     await callPOST({
-      From: NON_ALLOWLIST_PHONE,
+      From: PHONE_B,
       Body: INBOUND_BODY,
       MessageSid: 'SM_test_2',
     });
 
-    expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
-    expect(getAIResponseMock).toHaveBeenCalledTimes(1);
+    expect(runV2AgentInBackgroundMock).toHaveBeenCalledTimes(1);
   });
 
-  it('globallyEnabled=true → any phone routes to v2', async () => {
+  it('allowlist still wins when globallyEnabled=false (Phase-A-pre-flip safety)', async () => {
     loadSmsAiV2FlagsMock.mockResolvedValue({
       killSwitch: false,
-      enabledPhones: [],
-      globallyEnabled: true,
+      enabledPhones: [PHONE_A],
+      globallyEnabled: false,
     });
 
     await callPOST({
-      From: NON_ALLOWLIST_PHONE,
+      From: PHONE_A,
       Body: INBOUND_BODY,
       MessageSid: 'SM_test_3',
     });
 
     expect(runV2AgentInBackgroundMock).toHaveBeenCalledTimes(1);
-    expect(getAIResponseMock).not.toHaveBeenCalled();
   });
 
-  it('killSwitch=true overrides globallyEnabled + allowlist → routes to legacy', async () => {
+  it('non-allowlisted phone + globallyEnabled=false → no AI reply (no v1 fallback)', async () => {
     loadSmsAiV2FlagsMock.mockResolvedValue({
-      killSwitch: true,
-      enabledPhones: [ALLOWLIST_PHONE],
-      globallyEnabled: true,
+      killSwitch: false,
+      enabledPhones: [PHONE_A],
+      globallyEnabled: false,
     });
 
-    await callPOST({
-      From: ALLOWLIST_PHONE,
+    const res = await callPOST({
+      From: PHONE_B,
       Body: INBOUND_BODY,
       MessageSid: 'SM_test_4',
     });
 
+    expect(res.status).toBe(200);
     expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
-    expect(getAIResponseMock).toHaveBeenCalledTimes(1);
   });
 
-  it('flag load throws → falls through to legacy (defensive default)', async () => {
-    loadSmsAiV2FlagsMock.mockRejectedValueOnce(new Error('DB down'));
+  it('killSwitch=true overrides globallyEnabled + allowlist → no AI reply (v1 fallback removed in Phase C)', async () => {
+    loadSmsAiV2FlagsMock.mockResolvedValue({
+      killSwitch: true,
+      enabledPhones: [PHONE_A],
+      globallyEnabled: true,
+    });
 
-    await callPOST({
-      From: ALLOWLIST_PHONE,
+    const res = await callPOST({
+      From: PHONE_A,
       Body: INBOUND_BODY,
       MessageSid: 'SM_test_5',
     });
 
+    expect(res.status).toBe(200);
     expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
-    expect(getAIResponseMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('flag load throws → no AI reply, return 200 (no v1 fallback)', async () => {
+    loadSmsAiV2FlagsMock.mockRejectedValueOnce(new Error('DB down'));
+
+    const res = await callPOST({
+      From: PHONE_A,
+      Body: INBOUND_BODY,
+      MessageSid: 'SM_test_6',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('<Response/>');
+    expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
   });
 
   it('returns empty TwiML 200 to Twilio after firing v2 (return-early)', async () => {
     const res = await callPOST({
-      From: ALLOWLIST_PHONE,
+      From: PHONE_A,
       Body: INBOUND_BODY,
-      MessageSid: 'SM_test_6',
+      MessageSid: 'SM_test_7',
     });
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('<Response/>');
@@ -445,9 +387,9 @@ describe('Twilio inbound webhook — v2 routing decision', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const res = await callPOST({
-      From: ALLOWLIST_PHONE,
+      From: PHONE_A,
       Body: INBOUND_BODY,
-      MessageSid: 'SM_test_7',
+      MessageSid: 'SM_test_8',
     });
 
     expect(res.status).toBe(200);
@@ -459,8 +401,8 @@ describe('Twilio inbound webhook — v2 routing decision', () => {
   });
 });
 
-describe('Twilio inbound webhook — existing gates must skip BOTH AI paths', () => {
-  it('conversation.is_ai_enabled=false + allowlist phone → neither AI fires', async () => {
+describe('Twilio inbound webhook — existing gates must skip v2 (no AI fires)', () => {
+  it('conversation.is_ai_enabled=false → v2 NOT fired', async () => {
     fixture.conversation = {
       id: 'conv-1',
       customer_id: 'cust-1',
@@ -469,75 +411,70 @@ describe('Twilio inbound webhook — existing gates must skip BOTH AI paths', ()
     };
 
     await callPOST({
-      From: ALLOWLIST_PHONE,
+      From: PHONE_A,
       Body: INBOUND_BODY,
-      MessageSid: 'SM_test_8',
+      MessageSid: 'SM_test_9',
     });
 
     expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
-    expect(getAIResponseMock).not.toHaveBeenCalled();
   });
 
-  it('messaging_ai_customers_enabled=false + known customer + allowlist phone → neither AI fires', async () => {
+  it('messaging_ai_customers_enabled=false + known customer → v2 NOT fired', async () => {
     fixture.settings = {
       messaging_ai_unknown_enabled: 'false',
       messaging_ai_customers_enabled: 'false',
     };
 
     await callPOST({
-      From: ALLOWLIST_PHONE,
+      From: PHONE_A,
       Body: INBOUND_BODY,
-      MessageSid: 'SM_test_9',
-    });
-
-    expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
-    expect(getAIResponseMock).not.toHaveBeenCalled();
-  });
-
-  it('STOP keyword + allowlist phone → neither AI fires (TCPA short-circuit before AI block)', async () => {
-    await callPOST({
-      From: ALLOWLIST_PHONE,
-      Body: 'STOP',
       MessageSid: 'SM_test_10',
     });
 
     expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
-    expect(getAIResponseMock).not.toHaveBeenCalled();
   });
 
-  it('rate-limit exhausted (≥25 AI replies in last hour) + allowlist phone → neither AI fires', async () => {
-    fixture.recentAiCount = 25;
-
+  it('STOP keyword → v2 NOT fired (TCPA short-circuit before AI block)', async () => {
     await callPOST({
-      From: ALLOWLIST_PHONE,
-      Body: INBOUND_BODY,
+      From: PHONE_A,
+      Body: 'STOP',
       MessageSid: 'SM_test_11',
     });
 
     expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
-    expect(getAIResponseMock).not.toHaveBeenCalled();
   });
 
-  it('two_way_sms feature flag disabled → neither AI fires (route returns 200 before AI block)', async () => {
-    isFeatureEnabledMock.mockResolvedValue(false);
+  it('rate-limit exhausted (≥25 AI replies in last hour) → v2 NOT fired', async () => {
+    fixture.recentAiCount = 25;
 
     await callPOST({
-      From: ALLOWLIST_PHONE,
+      From: PHONE_A,
       Body: INBOUND_BODY,
       MessageSid: 'SM_test_12',
     });
 
     expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
-    expect(getAIResponseMock).not.toHaveBeenCalled();
+  });
+
+  it('two_way_sms feature flag disabled → v2 NOT fired (route returns 200 before AI block)', async () => {
+    isFeatureEnabledMock.mockResolvedValue(false);
+
+    await callPOST({
+      From: PHONE_A,
+      Body: INBOUND_BODY,
+      MessageSid: 'SM_test_13',
+    });
+
+    expect(runV2AgentInBackgroundMock).not.toHaveBeenCalled();
   });
 });
 
 describe('Twilio inbound webhook — v2 runner input contract', () => {
   it('passes inboundMessageBody / conversationId / phone (no customerId — runner uses phone for context lookup)', async () => {
     await callPOST({
-      From: ALLOWLIST_PHONE,
+      From: PHONE_A,
       Body: INBOUND_BODY,
-      MessageSid: 'SM_test_13',
+      MessageSid: 'SM_test_14',
     });
 
     expect(runV2AgentInBackgroundMock).toHaveBeenCalledTimes(1);
@@ -550,6 +487,6 @@ describe('Twilio inbound webhook — v2 runner input contract', () => {
     );
     expect(passed.inboundMessageBody).toBe(INBOUND_BODY);
     expect(passed.conversationId).toBe('conv-1');
-    expect(passed.phone).toBe(ALLOWLIST_PHONE);
+    expect(passed.phone).toBe(PHONE_A);
   });
 });

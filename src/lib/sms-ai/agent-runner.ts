@@ -273,7 +273,7 @@ export async function runSmsAiV2Agent(
 
   // 1. Build cached system body. Substitution happens BEFORE the cache_control
   //    block is attached so the substituted text becomes the cache key.
-  const promptShell = buildV2SystemPrompt({ businessName, businessHours, currentDate });
+  const promptShell = await buildV2SystemPrompt({ businessName, businessHours, currentDate });
 
   const ctx = await getCustomerContext({
     phone,

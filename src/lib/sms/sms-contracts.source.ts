@@ -279,10 +279,18 @@ export const SMS_CONTRACTS_SOURCE = {
       required: ['reason_label', 'customer_name', 'details', 'customer_phone'],
       optional: ['customer_email', 'last_name', 'vehicle_description'],
     },
-    staff_notification_inbound_specialty: {
-      required: ['customer_name', 'customer_phone', 'vehicle_description'],
-      optional: ['customer_email', 'size_class', 'customer_message_excerpt'],
-    },
+    // Phase C (Workstream A Layer 5, 2026-06-18) — staff_notification_inbound_specialty
+    // was the v1 SMS responder's staff-alert template for "specialty vehicle"
+    // inbound messages (the v1 routing tagged a customer's inbound as specialty
+    // by parsing the message text against a hand-coded keyword list). v2 routes
+    // specialty cases through the `notify_staff(reason="custom_quote")` tool
+    // instead, so this template no longer has a write site. Per Concern E
+    // (LOCKED soft-delete pattern), the DB row is marked `is_active=false` by
+    // the Phase C migration; this slug is removed from the contract source so
+    // generated-contracts.ts no longer surfaces it to the engine. The historical
+    // optional chips `size_class` + `customer_message_excerpt` are NOT used by
+    // any other slug, but stay declared in the palette above for now — orphan
+    // chips do not fail codegen.
     waitlist_slot_available: {
       required: ['service_name', 'appointment_date'],
       optional: ['first_name', 'last_name', 'business_name', 'business_phone'],

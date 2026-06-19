@@ -11,27 +11,20 @@
  *
  * Feature flag: two_way_sms
  *   STOP/START keyword processing and consent updates ALWAYS run (TCPA compliance).
- *   Conversation creation, AI auto-responder, after-hours replies, auto-quote,
- *   and message storage are gated by the two_way_sms feature flag.
+ *   Conversation creation, AI auto-responder (SMS AI v2; the v1 legacy path
+ *   was removed in Phase C), after-hours replies, and message storage are
+ *   gated by the two_way_sms feature flag.
  */
 
 import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
-import { sendSms, splitSmsMessage } from '@/lib/utils/sms';
-import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
-import { getAIResponse, type CustomerContext } from '@/lib/services/messaging-ai';
-import { extractAddonActions, approveAddon, declineAddon } from '@/lib/services/job-addons';
 import { loadSmsAiV2Flags, shouldUseSmsAiV2 } from '@/lib/sms-ai/feature-flag';
 import { runV2AgentInBackground } from '@/lib/sms-ai/background-dispatch';
 import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
-import { createQuote } from '@/lib/quotes/quote-service';
-import { createShortLink } from '@/lib/utils/short-link';
-import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
-import { applyCombosToQuoteItems } from '@/lib/services/combo-resolver';
 import crypto from 'crypto';
 
 const TWIML_EMPTY = '<Response/>';
@@ -66,101 +59,7 @@ const START_WORDS = [
 /** Max AI auto-replies per conversation per hour */
 const MAX_AI_REPLIES_PER_HOUR = 25;
 
-// -------------------------------------------------------------------
-// Auto-quote helpers
-// -------------------------------------------------------------------
 
-interface ParsedQuoteData {
-  customer_name: string;
-  customer_phone: string;
-  vehicle_year?: string;
-  vehicle_make: string;
-  vehicle_model: string;
-  vehicle_color?: string;
-  vehicle_type: string;
-  services: string[];
-  tier: string;
-}
-
-/** Parse [GENERATE_QUOTE] block from AI response. Replaces {phone} placeholder. */
-function extractQuoteRequest(
-  aiResponse: string,
-  phone: string
-): { cleanMessage: string; quoteData: ParsedQuoteData | null } {
-  const match = aiResponse.match(/\[GENERATE_QUOTE\]([\s\S]*?)\[\/GENERATE_QUOTE\]/);
-
-  if (!match) {
-    return { cleanMessage: aiResponse, quoteData: null };
-  }
-
-  const cleanMessage = aiResponse
-    .replace(/\[GENERATE_QUOTE\][\s\S]*?\[\/GENERATE_QUOTE\]/, '')
-    .trim();
-
-  const block = match[1];
-  const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
-
-  const fields: Record<string, string> = {};
-  const services: string[] = [];
-
-  for (const line of lines) {
-    const colonIdx = line.indexOf(':');
-    if (colonIdx === -1) continue;
-    const key = line.slice(0, colonIdx).trim();
-    const value = line.slice(colonIdx + 1).trim();
-    if (key === 'services') {
-      services.push(value);
-    } else {
-      fields[key] = value;
-    }
-  }
-
-  if (!fields.customer_name || services.length === 0 || !fields.vehicle_make || !fields.vehicle_model) {
-    console.warn('[Auto-Quote] Missing required fields in quote block');
-    return { cleanMessage, quoteData: null };
-  }
-
-  // Replace {phone} placeholder with actual phone number
-  const customerPhone = (fields.customer_phone || '').replace('{phone}', phone);
-
-  return {
-    cleanMessage,
-    quoteData: {
-      customer_name: fields.customer_name,
-      customer_phone: customerPhone || phone,
-      vehicle_year: fields.vehicle_year,
-      vehicle_make: fields.vehicle_make,
-      vehicle_model: fields.vehicle_model,
-      vehicle_color: fields.vehicle_color,
-      vehicle_type: fields.vehicle_type || 'sedan',
-      services,
-      tier: fields.tier || fields.vehicle_type || 'sedan',
-    },
-  };
-}
-
-/** Map AI vehicle_type output to DB size_class enum */
-function mapVehicleSizeClass(aiType: string): 'sedan' | 'truck_suv_2row' | 'suv_3row_van' {
-  switch (aiType) {
-    case 'truck_suv': return 'truck_suv_2row';
-    case 'suv_van': return 'suv_3row_van';
-    default: return 'sedan';
-  }
-}
-
-function splitName(fullName: string): { firstName: string; lastName: string } {
-  const trimmed = fullName.trim();
-  const lastSpaceIdx = trimmed.lastIndexOf(' ');
-  if (lastSpaceIdx === -1) {
-    return { firstName: trimmed, lastName: '' };
-  }
-  return {
-    firstName: trimmed.slice(0, lastSpaceIdx),
-    lastName: trimmed.slice(lastSpaceIdx + 1),
-  };
-}
-
-/** Split a long message into SMS-friendly chunks at natural break points */
 /**
  * Validate Twilio request signature.
  * https://www.twilio.com/docs/usage/security#validating-requests
@@ -474,8 +373,6 @@ export async function POST(request: NextRequest) {
     const hours = await getBusinessHours();
     const duringBusinessHours = hours ? isWithinBusinessHours(hours) : true;
 
-    let autoReply: string | null = null;
-
     const shouldAiReply =
       conversation.is_ai_enabled &&
       aiMasterEnabled &&
@@ -496,14 +393,14 @@ export async function POST(request: NextRequest) {
 
       if ((recentAiCount ?? 0) < MAX_AI_REPLIES_PER_HOUR) {
         // -------------------------------------------------------------
-        // SMS AI v2 routing decision (Layer 4).
-        // Sits after ALL legacy gates — signature, STOP, two_way_sms,
+        // SMS AI v2 routing (Phase C — v1 legacy fallback removed).
+        // Sits after ALL gating — signature, STOP, two_way_sms,
         // conversation create, inbound INSERT, is_ai_enabled, audience
-        // (messaging_ai_unknown/customers_enabled), rate-limit — so v2
-        // only fires when legacy AI would also have fired. If the
-        // shouldUseSmsAiV2 check fails or the flag load throws, fall
-        // through to legacy below; v2 is opt-in by allowlist or global
-        // toggle, legacy is the safe default. Kill switch wins all.
+        // (messaging_ai_unknown/customers_enabled), rate-limit. v2 is
+        // the SOLE AI path. shouldUseSmsAiV2 returning false (kill
+        // switch ON) OR a thrown flag-load / dispatch error both result
+        // in no AI reply — the customer's inbound is stored, manual
+        // inbox until fix. See docs/dev/SMS_AI_V2_ROLLBACK.md.
         // -------------------------------------------------------------
         try {
           const v2Flags = await loadSmsAiV2Flags();
@@ -528,458 +425,19 @@ export async function POST(request: NextRequest) {
         } catch (v2Err) {
           const msg = v2Err instanceof Error ? v2Err.message : String(v2Err);
           console.error(
-            `[SmsAiV2 routing] flag/dispatch threw — falling through to legacy: ${msg}`,
+            `[SmsAiV2 routing] flag/dispatch threw — dropping AI reply: ${msg}`,
           );
-          // Fall through to legacy below.
+          // v1 legacy fallback was deleted in Phase C (Workstream A
+          // Layer 5). On v2 flag-load / dispatch error, log + drop
+          // the AI reply rather than fall through. The customer's
+          // inbound message is already stored; manual inbox until
+          // operator action. Kill switch behaves identically.
+          return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });
         }
 
-        try {
-          const { data: allHistory } = await admin
-            .from('messages')
-            .select('*')
-            .eq('conversation_id', conversation.id)
-            .order('created_at', { ascending: true })
-            .limit(100);
-
-          // Class (a) Item #1 (Session #150) — AI-history inclusion predicate.
-          // Full contract documented at `shouldIncludeInAiHistory` jsdoc in
-          // `src/lib/utils/conversation-helpers.ts`. Extracted to make the
-          // predicate testable as a unit + visible alongside the writer-side
-          // contract (`reactivateIfClosed` lives in the same module and
-          // refers to the same `metadata.notificationType` discriminator).
-          const { shouldIncludeInAiHistory } = await import(
-            '@/lib/utils/conversation-helpers'
-          );
-          const history = (allHistory || []).filter(shouldIncludeInAiHistory);
-
-          // Build customer context for known customers
-          let customerCtx: CustomerContext | undefined;
-          if (isCustomer && conversation.customer_id) {
-            const custId = conversation.customer_id;
-
-            const [
-              { data: custData },
-              { data: txns },
-              { data: vehicles },
-              { data: appointments },
-              { data: quotes },
-            ] = await Promise.all([
-              admin
-                .from('customers')
-                .select('first_name, last_name, email, customer_type, loyalty_points_balance, notes, tags, first_visit_date, last_visit_date, visit_count, lifetime_spend')
-                .eq('id', custId)
-                .single(),
-              admin
-                .from('transactions')
-                .select('transaction_date, total_amount, transaction_items(item_name)')
-                .eq('customer_id', custId)
-                .order('transaction_date', { ascending: false })
-                .limit(10),
-              admin
-                .from('vehicles')
-                .select('year, make, model, color, vehicle_type, size_class')
-                .eq('customer_id', custId)
-                .order('created_at', { ascending: false }),
-              admin
-                .from('appointments')
-                .select('scheduled_date, scheduled_time, status, appointment_services(services(name))')
-                .eq('customer_id', custId)
-                .gte('scheduled_date', new Date().toISOString().split('T')[0])
-                .neq('status', 'cancelled')
-                .order('scheduled_date', { ascending: true })
-                .limit(5),
-              admin
-                .from('quotes')
-                .select('quote_number, status, total_amount, valid_until, quote_items(quantity, total_price)')
-                .eq('customer_id', custId)
-                .is('deleted_at', null)
-                .order('created_at', { ascending: false })
-                .limit(3),
-            ]);
-
-            if (custData) {
-              customerCtx = {
-                name: `${custData.first_name} ${custData.last_name}`.trim(),
-                email: custData.email || undefined,
-                customer_type: custData.customer_type,
-                transaction_history: (txns || []).map((t) => ({
-                  date: new Date(t.transaction_date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }),
-                  services: ((t.transaction_items as Array<{ item_name: string }>) || []).map(
-                    (i) => i.item_name
-                  ),
-                  total: t.total_amount,
-                })),
-                vehicles: (vehicles || []).map((v) => ({
-                  year: v.year,
-                  make: v.make,
-                  model: v.model,
-                  color: v.color,
-                  vehicle_type: v.vehicle_type,
-                  size_class: v.size_class,
-                })),
-                appointments: (appointments || []).map((a) => ({
-                  date: new Date(a.scheduled_date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }),
-                  time: a.scheduled_time || '',
-                  status: a.status,
-                  services: ((a.appointment_services as unknown as Array<{ services: { name: string } }>) || []).map(
-                    (as) => as.services?.name || 'Service'
-                  ),
-                })),
-                quotes: (quotes || []).map((q) => ({
-                  quote_number: q.quote_number,
-                  status: q.status,
-                  total: q.total_amount,
-                  valid_until: q.valid_until,
-                  services: ((q.quote_items as Array<{ quantity: number; total_price: number }>) || []).map(
-                    (_item, idx) => `Item ${idx + 1}`
-                  ),
-                })),
-                loyalty_points: custData.loyalty_points_balance || 0,
-                notes: custData.notes || null,
-                tags: custData.tags || [],
-                first_visit: custData.first_visit_date
-                  ? new Date(custData.first_visit_date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })
-                  : null,
-                last_visit: custData.last_visit_date
-                  ? new Date(custData.last_visit_date).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })
-                  : null,
-                visit_count: custData.visit_count || 0,
-                lifetime_spend: custData.lifetime_spend || 0,
-              };
-            }
-          }
-
-          // Specialty vehicle gate: if customer has ANY exotic/classic vehicle,
-          // pivot to custom-quote handoff instead of AI catalog quoting.
-          let hasSpecialtyVehicle = false;
-          let specialtyVehicleDesc = '';
-          let specialtyVehicleWord = 'specialty';
-          if (isCustomer && conversation.customer_id) {
-            // Session 29: specialty vehicles are identified by size_class IN ('exotic','classic').
-            const { data: specialtyCheck } = await admin
-              .from('vehicles')
-              .select('year, make, model, size_class')
-              .eq('customer_id', conversation.customer_id)
-              .in('size_class', ['exotic', 'classic'])
-              .limit(1)
-              .maybeSingle();
-            if (specialtyCheck) {
-              hasSpecialtyVehicle = true;
-              specialtyVehicleDesc = [specialtyCheck.year, specialtyCheck.make, specialtyCheck.model].filter(Boolean).join(' ') || 'your vehicle';
-              specialtyVehicleWord = specialtyCheck.size_class === 'classic' ? 'classic' : 'exotic';
-            }
-          }
-
-          if (hasSpecialtyVehicle) {
-            autoReply = `Thanks for reaching out! For ${specialtyVehicleDesc}, we give custom quotes because every ${specialtyVehicleWord} vehicle is unique. Can I have one of our specialists call you back? What's the best time to reach you?`;
-
-            // Fire staff notification
-            try {
-              const custName = customerCtx?.name || 'Unknown customer';
-              const customerMessageExcerpt = body.slice(0, 100);
-              const staffMsg = `Specialty vehicle SMS inquiry!\n${custName} (${normalizedPhone}) texted about their ${specialtyVehicleWord} ${specialtyVehicleDesc}.\nLast message: "${customerMessageExcerpt}"\n\nRequires custom quote — please follow up.`;
-              const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
-              const { getBusinessInfo } = await import('@/lib/data/business');
-              const [templateResult, biz] = await Promise.all([
-                // Session 2F: chip-driven send via dedicated sub-slug whose
-                // contract matches the inbound-specialty data scope (no
-                // reason_label / details — those are voice-agent escalation
-                // chips). Engine renders the body; staffMsg above stays as
-                // defense-in-depth fallback.
-                renderSmsTemplate('staff_notification_inbound_specialty', {
-                  customer_name: custName,
-                  customer_phone: normalizedPhone,
-                  vehicle_description: specialtyVehicleDesc,
-                  customer_email: customerCtx?.email || undefined,
-                  size_class: specialtyVehicleWord,
-                  customer_message_excerpt: customerMessageExcerpt || undefined,
-                }, staffMsg),
-                getBusinessInfo(),
-              ]);
-              const smsBody = templateResult?.body || staffMsg;
-              const recipients = templateResult?.recipientPhones?.length
-                ? templateResult.recipientPhones
-                : [biz.phone].filter(Boolean);
-              const { sendSms } = await import('@/lib/utils/sms');
-              for (const rPhone of recipients) {
-                if (rPhone) await sendSms(rPhone, smsBody);
-              }
-            } catch (notifyErr) {
-              console.error('[Messaging] Staff notification for specialty vehicle failed:', notifyErr);
-            }
-
-            // Disable AI on this conversation — staff takes over
-            await admin.from('conversations').update({ is_ai_enabled: false }).eq('id', conversation.id);
-            console.log(`[Messaging] Disabled AI for conversation ${conversation.id} — specialty vehicle detected`);
-          } else {
-            autoReply = await getAIResponse(
-              history || [],
-              body,
-              customerCtx,
-              conversation.customer_id,
-              conversation.summary,
-              conversation.last_notification_type,
-              conversation.last_notification_at,
-            );
-          }
-        } catch (err) {
-          console.error('AI auto-reply failed:', err);
-        }
       } else {
         console.warn(`[Messaging] Rate limit hit for conversation ${conversation.id}`);
       }
-    }
-
-    // -------------------------------------------------------------------
-    // 9. Auto-quote processing — extract quote block and generate real quote
-    // -------------------------------------------------------------------
-    if (autoReply) {
-      const { cleanMessage, quoteData } = extractQuoteRequest(autoReply, normalizedPhone);
-
-      if (quoteData) {
-        try {
-          const { firstName, lastName } = splitName(quoteData.customer_name);
-          const sizeClass = mapVehicleSizeClass(quoteData.vehicle_type);
-
-          // Find or create customer
-          let quoteCustomerId = customerId;
-          if (!quoteCustomerId) {
-            const { data: existingCust } = await admin
-              .from('customers')
-              .select('id')
-              .eq('phone', normalizedPhone)
-              .limit(1)
-              .single();
-
-            if (existingCust) {
-              quoteCustomerId = existingCust.id;
-            } else {
-              const { data: newCust, error: custErr } = await admin
-                .from('customers')
-                .insert({
-                  first_name: firstName,
-                  last_name: lastName,
-                  phone: normalizedPhone,
-                  sms_consent: true,
-                  email_consent: false, // No explicit email opt-in — CAN-SPAM requires affirmative consent
-                  customer_type: 'enthusiast',
-                })
-                .select('id')
-                .single();
-
-              if (custErr || !newCust) {
-                throw new Error(`Customer creation failed: ${custErr?.message}`);
-              }
-              quoteCustomerId = newCust.id;
-
-              // Log SMS consent for new customer (texting in = implied consent)
-              await updateSmsConsent({
-                customerId: newCust.id,
-                phone: normalizedPhone,
-                action: 'opt_in',
-                keyword: 'sms_initiated',
-                source: 'inbound_sms',
-                notes: 'Customer initiated SMS conversation (auto-quote)',
-              });
-            }
-          }
-
-          // Find or create vehicle — shared dedup by make + model + category
-          let vehicleId: string | null = null;
-          if (quoteCustomerId) {
-            const { findOrCreateVehicle } = await import('@/lib/utils/vehicle-helpers');
-            const vehicleResult = await findOrCreateVehicle(admin, {
-              customerId: quoteCustomerId,
-              make: quoteData.vehicle_make,
-              model: quoteData.vehicle_model,
-              year: quoteData.vehicle_year,
-              color: quoteData.vehicle_color,
-            });
-            if (vehicleResult) vehicleId = vehicleResult.id;
-          }
-
-          // Resolve services and prices (sale-aware)
-          let quoteItems: Array<{
-            service_id: string;
-            item_name: string;
-            quantity: number;
-            unit_price: number;
-            tier_name: string | null;
-            standard_price: number | null;
-            pricing_type: 'standard' | 'sale' | 'combo' | null;
-          }> = [];
-
-          for (const serviceName of quoteData.services) {
-            const service = await resolveServiceByName(admin, serviceName);
-            if (!service) {
-              console.warn(`[Auto-Quote] Service not found: "${serviceName}"`);
-              continue;
-            }
-            const { price, salePrice, tierName, isOnSale } = resolvePrice(service, sizeClass);
-            quoteItems.push({
-              service_id: service.id,
-              item_name: service.name,
-              quantity: 1,
-              unit_price: isOnSale ? salePrice! : price,
-              tier_name: tierName,
-              standard_price: isOnSale ? price : null,
-              pricing_type: isOnSale ? 'sale' : 'standard',
-            });
-          }
-
-          // Issue 33 Layer 1: apply combo pricing from service_addon_suggestions.
-          quoteItems = await applyCombosToQuoteItems(admin, quoteItems);
-
-          if (quoteItems.length > 0) {
-            // Read quote validity from admin settings
-            const { data: validitySetting } = await admin
-              .from('business_settings')
-              .select('value')
-              .eq('key', 'quote_validity_days')
-              .maybeSingle();
-
-            let quoteValidityDays = 10; // fallback
-            if (validitySetting?.value) {
-              try {
-                const parsed = JSON.parse(validitySetting.value);
-                if (typeof parsed === 'number' && parsed > 0) quoteValidityDays = parsed;
-              } catch { /* use fallback */ }
-            }
-
-            const validUntil = new Date(Date.now() + quoteValidityDays * 24 * 60 * 60 * 1000).toISOString();
-
-            const { quote } = await createQuote(admin, {
-              customer_id: quoteCustomerId,
-              vehicle_id: vehicleId || undefined,
-              items: quoteItems,
-              valid_until: validUntil,
-            }, 'twilio_legacy');
-
-            // Update quote from draft → sent
-            const quoteRecord = quote as { id: string; access_token: string };
-            await admin
-              .from('quotes')
-              .update({ status: 'sent', sent_at: new Date().toISOString() })
-              .eq('id', quoteRecord.id);
-
-            // Generate short link for the quote
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-            const quoteUrl = `${appUrl}/quote/${quoteRecord.access_token}`;
-            let linkUrl = quoteUrl;
-            try {
-              linkUrl = await createShortLink(quoteUrl);
-            } catch {
-              // Fall back to full URL
-            }
-
-            // Log quote communication
-            const { error: commErr } = await admin.from('quote_communications').insert({
-              quote_id: quoteRecord.id,
-              channel: 'sms',
-              sent_to: normalizedPhone,
-              status: 'sent',
-            });
-            if (commErr) console.error('[Auto-Quote] Failed to log communication:', commErr.message);
-
-            // Append quote link to clean message (splitting handled later)
-            autoReply = cleanMessage + `\n\nView your quote: ${linkUrl}`;
-
-            // Link customer to conversation if not already linked
-            if (quoteCustomerId && !conversation.customer_id) {
-              await admin
-                .from('conversations')
-                .update({ customer_id: quoteCustomerId })
-                .eq('id', conversation.id);
-            }
-          } else {
-            // No services resolved — send clean message without link
-            autoReply = cleanMessage;
-          }
-        } catch (err) {
-          console.error('[Auto-Quote] Failed to generate quote:', err);
-          autoReply = cleanMessage;
-        }
-      } else {
-        // No quote block — use clean message as-is (splitting handled below)
-        autoReply = cleanMessage;
-      }
-    }
-
-    // -------------------------------------------------------------------
-    // 10. Addon authorization processing — extract and handle AUTHORIZE/DECLINE blocks
-    // -------------------------------------------------------------------
-    if (autoReply) {
-      const { authorizeIds, declineIds, cleanedMessage } = extractAddonActions(autoReply);
-
-      // Session 3A: chip-driven (slug `addon_authorization_expired`). Body has
-      // zero chips; engine returns either the rendered body or — if operator
-      // toggled the slug off — isActive:false and we skip. Conversation
-      // logging intentionally NOT enabled here to preserve pre-3A behavior;
-      // see CHANGELOG note flagging this for future operator decision.
-      const expiredFallback = 'That authorization has expired. Would you like us to send a new one?';
-
-      // Process authorizations
-      for (const addonId of authorizeIds) {
-        try {
-          const result = await approveAddon(addonId);
-          if (!result.success && result.expired) {
-            const tpl = await renderSmsTemplate('addon_authorization_expired', {}, expiredFallback);
-            if (tpl.isActive && tpl.body) {
-              await sendSms(normalizedPhone, tpl.body);
-            }
-          }
-        } catch (err) {
-          console.error(`[AddonAuth] Failed to approve addon ${addonId}:`, err);
-        }
-      }
-
-      // Process declines
-      for (const addonId of declineIds) {
-        try {
-          const result = await declineAddon(addonId);
-          if (!result.success && result.expired) {
-            const tpl = await renderSmsTemplate('addon_authorization_expired', {}, expiredFallback);
-            if (tpl.isActive && tpl.body) {
-              await sendSms(normalizedPhone, tpl.body);
-            }
-          }
-        } catch (err) {
-          console.error(`[AddonAuth] Failed to decline addon ${addonId}:`, err);
-        }
-      }
-
-      // Use cleaned message (blocks stripped) for the conversation
-      if (authorizeIds.length > 0 || declineIds.length > 0) {
-        autoReply = cleanedMessage;
-      }
-    }
-
-    // Send the auto-reply if we have one — split long messages into chunks
-    if (autoReply) {
-      const smsChunks = splitSmsMessage(autoReply);
-
-      for (const chunk of smsChunks) {
-        const smsResult = await sendSms(normalizedPhone, chunk);
-
-        await admin.from('messages').insert({
-          conversation_id: conversation.id,
-          direction: 'outbound',
-          body: chunk,
-          sender_type: 'ai',
-          twilio_sid: smsResult.success ? smsResult.sid : null,
-          status: smsResult.success ? 'sent' : 'failed',
-          channel: 'sms',
-        });
-      }
-
-      const lastChunk = smsChunks[smsChunks.length - 1];
-      await admin
-        .from('conversations')
-        .update({
-          last_message_at: new Date().toISOString(),
-          last_message_preview: lastChunk.substring(0, 100),
-        })
-        .eq('id', conversation.id);
     }
 
     return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });

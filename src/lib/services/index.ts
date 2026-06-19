@@ -3,9 +3,9 @@
  * engine + hook. Per CLAUDE.md Rule 22, all service-pricing math must
  * import from this module (or its sub-paths).
  *
- * Existing files in `src/lib/services/` (audit, shippo, messaging-ai,
- * etc.) are imported via their direct sub-paths and are NOT re-exported
- * here. This barrel deliberately scopes to the picker-engine surface.
+ * Existing files in `src/lib/services/` (audit, shippo, etc.) are
+ * imported via their direct sub-paths and are NOT re-exported here.
+ * This barrel deliberately scopes to the picker-engine surface.
  */
 
 export {

@@ -40,41 +40,14 @@ interface AddonActionResult {
   expired?: boolean;
 }
 
-interface ExtractedAddonActions {
-  authorizeIds: string[];
-  declineIds: string[];
-  cleanedMessage: string;
-}
-
-// ---------------------------------------------------------------------------
-// Extract [AUTHORIZE_ADDON:uuid] and [DECLINE_ADDON:uuid] blocks from AI text
-// ---------------------------------------------------------------------------
-
-export function extractAddonActions(aiResponse: string): ExtractedAddonActions {
-  const authorizeIds: string[] = [];
-  const declineIds: string[] = [];
-
-  // Match [AUTHORIZE_ADDON:uuid] blocks
-  const authorizePattern = /\[AUTHORIZE_ADDON:([a-f0-9-]+)\]/gi;
-  let match: RegExpExecArray | null;
-  while ((match = authorizePattern.exec(aiResponse)) !== null) {
-    authorizeIds.push(match[1]);
-  }
-
-  // Match [DECLINE_ADDON:uuid] blocks
-  const declinePattern = /\[DECLINE_ADDON:([a-f0-9-]+)\]/gi;
-  while ((match = declinePattern.exec(aiResponse)) !== null) {
-    declineIds.push(match[1]);
-  }
-
-  // Strip the blocks from the message
-  const cleanedMessage = aiResponse
-    .replace(/\[AUTHORIZE_ADDON:[a-f0-9-]+\]/gi, '')
-    .replace(/\[DECLINE_ADDON:[a-f0-9-]+\]/gi, '')
-    .trim();
-
-  return { authorizeIds, declineIds, cleanedMessage };
-}
+// Phase C (Workstream A Layer 5, 2026-06-18) — extractAddonActions, the
+// AUTHORIZE_ADDON / DECLINE_ADDON regex constants, and the ExtractedAddonActions
+// interface have been removed. v1's text-markup-block approval mechanism is
+// superseded by SMS AI v2's `approve_addon` / `decline_addon` tool calls
+// (dispatched via src/lib/sms-ai/tool-dispatcher.ts → approveAddon /
+// declineAddon below). The web-page approve/decline endpoints in
+// /api/authorize/[token]/{approve,decline}/route.ts continue to call into
+// approveAddon / declineAddon unchanged.
 
 // ---------------------------------------------------------------------------
 // Approve addon — validates, updates status, sends confirmation
@@ -337,12 +310,12 @@ This customer has a pending add-on authorization for their current vehicle servi
 - Authorization ID: ${addon.id}
 
 RULES:
-- If the customer says yes, approve, go ahead, do it, sounds good, or similar affirmative → confirm you'll let the team know and output [AUTHORIZE_ADDON:${addon.id}]
-- If the customer says no, decline, skip it, not today, or similar negative → acknowledge gracefully, mention they can get it done next visit, and output [DECLINE_ADDON:${addon.id}]
+- If the customer says yes, approve, go ahead, do it, sounds good, or similar affirmative → confirm you'll let the team know and call the approve_addon tool with addon id ${addon.id}.
+- If the customer says no, decline, skip it, not today, or similar negative → acknowledge gracefully, mention they can get it done next visit, and call the decline_addon tool with addon id ${addon.id}.
 - If they ask questions about the service, timing, or price → answer from the context above. Be helpful and informative.
 - You CANNOT negotiate price. If they push back on cost, empathize and suggest they call the shop to discuss options.
 - If they ask "how long will it take?" → tell them the estimated additional time (${addon.pickup_delay_minutes} minutes).
-- Only output the [AUTHORIZE_ADDON] or [DECLINE_ADDON] block ONCE per addon.`;
+- Only call approve_addon or decline_addon ONCE per addon.`;
 
       sections.push(section);
     } else {
