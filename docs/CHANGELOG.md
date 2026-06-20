@@ -6,6 +6,54 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(admin): Transactions LIST — add Detailer column + Receipt # 84 + #157 column reorder (2026-06-20, Session #157)
+
+Operator-driven UX iteration the day after Session #156. Adds a new Detailer column surfacing the assigned detailer per row, widens Receipt # for headroom on longer formats, and reorders columns to put Status at the rightmost slot with Services moved back near Customer. Not a tip-display fix (the Session #156 Adjacent-4 work is unchanged in behavior); this is column-layout iteration on top of the same canonical-Total foundation.
+
+### Added
+
+- **Detailer column** (NEW, 10th column at position 6, 100px width, immediately right of Employee). Sources the first non-cancelled job's `assigned_staff.first_name` per row, derived as `tx.jobs?.find((j) => j.status !== 'cancelled')?.assigned_staff?.first_name ?? null`. Plain text rendering (no link per operator decision Q5); `---` fallback for walk-in product sales and pre-job booking-deposit rows where no job exists yet. Operator Q3 guarantee: detailer is always assigned before a job is started, so `---` renders only for rows that never had a job — never for "job exists but unassigned." Employee column kept untouched per operator decision Q4 — both columns now coexist (cashier visibility + detailer visibility side-by-side).
+
+### Changed
+
+- **Receipt # column width** widened from `w-[72px]` → `w-[84px]` for headroom on longer receipt-number formats (e.g., 10-char `SD-0000123` or future category prefixes like `BD-...`). Existing receipt sort affordance preserved.
+- **Column order restructured** from Session #156's Option B (`Date | Receipt # | Customer | Employee | Method | Status | Services | Tip | Total`) to **`Date | Receipt # | Customer | Services | Employee | Detailer | Method | Tip | Total | Status`**. Substantive shifts: (1) Services moves from position 7 → 4 (back near Customer); (2) NEW Detailer at position 6 (immediately right of Employee); (3) Status moves from position 6 → 10 (now rightmost). Tip + Total pair (positions 8–9) preserved from Session #156. Customer width stays at 180 px per Session #156 operator lock.
+- **CSV export header sequence** mirrors the on-screen reorder: `['Date', 'Receipt #', 'Customer', 'Services', 'Employee', 'Detailer', 'Method', 'Tip', 'Total', 'Status']`. CSV row body emits `detailerFirstName ?? ''` in the new slot (empty string fallback so the CSV cell stays empty when no detailer is assigned — consistent with other optional-data CSV cells like Method).
+
+### What shipped
+
+- **`src/app/admin/transactions/page.tsx` MOD** — five distinct change clusters:
+  - **SELECT extension** (`~line 258`): added `jobs:jobs(status, assigned_staff:employees!jobs_assigned_staff_id_fkey(first_name))` embed to the existing SELECT. PostgREST returns an array (jobs.transaction_id is non-unique FK); cell renderer + CSV row body both pick the first non-cancelled job. **Explicit FK hint mandatory** — `jobs` has THREE FKs to `employees` (`assigned_staff_id`, `created_by`, `cancelled_by` per DB_SCHEMA.md L1273+L1288+L1292); without the `employees!jobs_assigned_staff_id_fkey` hint PostgREST throws PGRST201 ambiguity. Same precedent as SLA cron fix `c931becc` (Session #153) and Session #155 transaction-detail FK hint.
+  - **`TransactionRow` type extension** (`~lines 54-67`): additive `jobs: Array<{status: string; assigned_staff: Pick<Employee, 'first_name'> | null}> | null` field with explanatory doc block citing DB_SCHEMA.md L1273.
+  - **`<thead>` rewrite** (header block): Receipt # `w-[72px]` → `w-[84px]`; new Detailer `<th className="px-3 py-3 w-[100px]">Detailer</th>` between Employee and Method; Status `<th>` moved to last position; explanatory comment block updated for #157.
+  - **`<TransactionTableRow>` rewrite**: derives `detailerFirstName` at component head from first non-cancelled job; NEW Detailer cell (`<td className="px-3 py-3 max-w-[100px] truncate text-gray-600">` with `{detailerFirstName ?? <span ...>---</span>}` conditional); cell order swapped to match new column order; Status cell moved to bottom of cell list.
+  - **`<ExportButton>` rewrite**: headers array reordered with `'Detailer'` between `'Employee'` and `'Method'` + `'Status'` moved to end; row body derives `detailerFirstName` per row from the same source as the on-screen cell; emits in correct slot; status emits as last entry.
+- **`src/app/admin/transactions/__tests__/transactions-list-tip-display.test.ts` MOD** — 3 existing cases updated for #157 reorder (case 1 column-order sequence, case 3 Tip header adjacency now after Method, case 8 CSV header order) + 7 NEW cases (11-17): Receipt # 84 width, Detailer column header + adjacency + non-sortable, Detailer cell plain text + `---` fallback + no-link defense, detailer derivation expression, SELECT FK hint, TransactionRow type shape, CSV detailer slot + Status last. Pre-#156 + pre-#157 anti-regression guards in cases 8 + 3 (both old orders pinned as GONE). Test count: 12 → 19 (+7 net new; 3 updated in-place).
+- **`docs/CHANGELOG.md`** — this entry.
+- **`docs/dev/ROADMAP-13-ITEMS.md`** — Session #157 ledger row at the top of the table.
+
+### Hard rules respected
+
+- NO new dependencies. NO migrations (UI display + data-fetch extension only — `jobs.assigned_staff_id` already exists per DB_SCHEMA.md L1273). NO scope creep into Adjacent-2 (portal Transaction summary — still deferred per Session #155 Q3) or Adjacent-3 (Appointment card). NO scope changes to Session #155/#156 canonical-Total formula or close-out-shell subtitle logic (both preserved unchanged). NO ROADMAP-13 item move — Item 3 stays ✅ done across Sessions #155 + #156; this session is column-layout polish on the already-closed item.
+
+### Gates
+
+- **tsc:** 3 baseline preserved (`customer-accept-service.test.ts:44,49,73` TS2556 unchanged per Memory #29 Targeted-discipline). No new errors on changed files.
+- **lint:** 0 new errors on touched file. 1 pre-existing warning unrelated (`page.tsx:20` `FilterValue` unused since `45cc2f534` 2026-04-10).
+- **vitest:** baseline + 7 new = **3494 passed / 66 skipped (was 3487 baseline at Session #156)**.
+- **build:** clean.
+
+### Not in scope (deferred / out of band)
+
+- Tip splitting + role-based tip allocation between cashier and detailer (that's Item 4)
+- Multi-detailer-per-job (operator Q2 + Q3 confirmed single detailer per job)
+- Detailer performance analytics or per-detailer filter chrome
+- Stats card detailer breakouts at the top of the page
+- Adjacent-2 (portal Transaction summary card) — still deferred per Session #155 Q3 lock
+- ROADMAP-13 item movement (Item 3 fully closed across #155 + #156; #157 is layout polish on the already-closed item)
+
+---
+
 ## Item 3 Adjacent-4 — Admin Transactions LIST view + CSV export tip fix + Option B column restructure (2026-06-19, Session #156)
 
 **Operator-driven follow-up the same day as Session #155.** A column-audit pass on `src/app/admin/transactions/page.tsx` exposed that the LIST view (the daily-reconciliation entry point) shares the **same canonical-Total bug** as the DETAIL view we closed in Session #155 — but with broader operational reach. The fix mirrors Session #155 byte-equivalently for the on-screen Total cell + CSV export, and bundles in an operator-locked column restructure (Option B) + Customer width + new Tip column + audit-doc Adjacent-4 entry. **CORRECTIONS** sub-section below also addresses my Session #155 narrative misstatement ($460 → $230 corrected).

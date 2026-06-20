@@ -50,6 +50,18 @@ type TransactionRow = Transaction & {
   customer: Pick<Customer, 'id' | 'first_name' | 'last_name' | 'phone'> | null;
   employee: Pick<Employee, 'id' | 'first_name' | 'last_name'> | null;
   items: Pick<TransactionItem, 'id' | 'item_name'>[];
+  // Session #157: jobs embed surfaces the assigned detailer for the new
+  // Detailer column. PostgREST cardinality for `jobs.transaction_id` is
+  // non-unique → returns an ARRAY (zero or more job rows per transaction).
+  // Cell renderer picks the first non-cancelled job's `assigned_staff`
+  // (defensive against legacy data with cancelled jobs that would otherwise
+  // surface a stale detailer name). Source: `jobs.assigned_staff_id`
+  // (FK → employees(id), DB_SCHEMA.md L1273); detailers are `employees`
+  // rows with role='detailer' (user_role enum).
+  jobs: Array<{
+    status: string;
+    assigned_staff: Pick<Employee, 'first_name'> | null;
+  }> | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -239,7 +251,11 @@ export default function AdminTransactionsPage() {
         let query = supabase
           .from('transactions')
           .select(
-            '*, customer:customers(id, first_name, last_name, phone), employee:employees(id, first_name, last_name), items:transaction_items(id, item_name)',
+            // Session #157: `jobs` embed surfaces the assigned detailer for
+            // the new Detailer column at-a-glance. PostgREST returns an
+            // array (jobs.transaction_id is non-unique FK); the row renderer
+            // takes the first non-cancelled job's `assigned_staff.first_name`.
+            '*, customer:customers(id, first_name, last_name, phone), employee:employees(id, first_name, last_name), items:transaction_items(id, item_name), jobs:jobs(status, assigned_staff:employees!jobs_assigned_staff_id_fkey(first_name))',
             { count: 'exact' }
           )
           .order(dbSortCol, { ascending })
@@ -585,15 +601,22 @@ export default function AdminTransactionsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    {/* Session #156 (Item 3 Adjacent-4 fix): column order
-                        switched to Option B — Date | Receipt # | Customer
-                        | Employee | Method | Status | Services | Tip |
-                        Total. Services-Tip-Total now form a contiguous
-                        right-aligned financial cluster mirroring the
-                        receipt's spatial layout (line items → tip line →
-                        TOTAL). Customer widened 144px → 180px to hold
-                        longer real-world names without truncation. Tip
-                        column NEW (80px); not sortable per operator lock. */}
+                    {/* Session #157 column reorder: Date | Receipt # |
+                        Customer | Services | Employee | Detailer | Method
+                        | Tip | Total | Status. Services moves back near
+                        Customer (positions 4) per operator scan pattern;
+                        Detailer NEW (100px, matches Employee, immediately
+                        to the right per operator lock); Status moves to
+                        the rightmost slot. Receipt # widened 72px → 84px
+                        for headroom on longer receipt formats. Customer
+                        stays at 180px (Session #156 lock). Detailer cell
+                        renders the first non-cancelled job's
+                        `assigned_staff.first_name` (DB_SCHEMA.md L1273:
+                        `jobs.assigned_staff_id` FK → employees(id));
+                        plain text, no link per operator decision #5;
+                        `---` fallback only fires for walk-in product
+                        sales / pre-job booking deposits (operator Q3
+                        guarantees detailer assignment before job start). */}
                     <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       <th
                         className="px-3 py-3 w-[72px] cursor-pointer select-none"
@@ -604,7 +627,7 @@ export default function AdminTransactionsPage() {
                         </div>
                       </th>
                       <th
-                        className="px-3 py-3 w-[72px] cursor-pointer select-none"
+                        className="px-3 py-3 w-[84px] cursor-pointer select-none"
                         onClick={() => handleHeaderSort('receipt_number')}
                       >
                         <div className="flex items-center gap-1">
@@ -612,10 +635,10 @@ export default function AdminTransactionsPage() {
                         </div>
                       </th>
                       <th className="px-3 py-3 w-[180px]">Customer</th>
-                      <th className="px-3 py-3 w-[100px]">Employee</th>
-                      <th className="px-3 py-3 w-[70px]">Method</th>
-                      <th className="px-3 py-3 w-[90px]">Status</th>
                       <th className="px-3 py-3">Services</th>
+                      <th className="px-3 py-3 w-[100px]">Employee</th>
+                      <th className="px-3 py-3 w-[100px]">Detailer</th>
+                      <th className="px-3 py-3 w-[70px]">Method</th>
                       <th className="px-3 py-3 w-[80px] text-right">Tip</th>
                       <th
                         className="px-3 py-3 w-[80px] text-right cursor-pointer select-none"
@@ -625,6 +648,7 @@ export default function AdminTransactionsPage() {
                           Total <SortIndicator column="total_amount" />
                         </div>
                       </th>
+                      <th className="px-3 py-3 w-[90px]">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -729,6 +753,17 @@ function TransactionTableRow({
     ? `${tx.customer.first_name} ${tx.customer.last_name}`.trim()
     : null;
 
+  // Session #157: derive detailer first name from the first non-cancelled
+  // job for this transaction. PostgREST embed returns an array (jobs.
+  // transaction_id is non-unique FK); cancelled jobs are filtered out so
+  // the cell never surfaces a stale detailer name from a voided job. Q3
+  // operator lock: detailer is always assigned before job start, so this
+  // resolves to a real name on every job-bearing transaction. Walk-in
+  // product sales / pre-job booking-deposit rows have no job → null →
+  // `---` fallback.
+  const detailerFirstName =
+    tx.jobs?.find((j) => j.status !== 'cancelled')?.assigned_staff?.first_name ?? null;
+
   return (
     <tr className="transition-colors hover:bg-gray-50">
       <td className="whitespace-nowrap px-3 py-3 text-gray-600" title={formatDateTime(tx.transaction_date)}>
@@ -763,6 +798,13 @@ function TransactionTableRow({
           <span className="text-gray-600">Walk-in</span>
         )}
       </td>
+      <td className="px-3 py-3 text-sm text-gray-600">
+        {tx.items && tx.items.length > 0 ? (
+          tx.items.map((i: { item_name: string }) => i.item_name).join(', ')
+        ) : (
+          <span className="text-gray-400">--</span>
+        )}
+      </td>
       <td className="px-3 py-3 max-w-[100px] truncate">
         {tx.employee ? (
           <a
@@ -777,28 +819,20 @@ function TransactionTableRow({
           <span className="text-gray-600">---</span>
         )}
       </td>
+      {/* Session #157 NEW Detailer column. Plain text (no link per
+          operator decision Q5); `---` fallback for walk-in product sales
+          and pre-job booking-deposit rows where no job exists yet. */}
+      <td className="px-3 py-3 max-w-[100px] truncate text-gray-600">
+        {detailerFirstName ?? (
+          <span className="text-gray-400">---</span>
+        )}
+      </td>
       <td className="whitespace-nowrap px-3 py-3 text-gray-600">
         {tx.payment_method
           ? tx.payment_method.charAt(0).toUpperCase() + tx.payment_method.slice(1)
           : '---'}
       </td>
-      <td className="whitespace-nowrap px-3 py-3">
-        <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-            STATUS_BADGE_CLASSES[tx.status] ?? 'bg-gray-100 text-gray-500'
-          }`}
-        >
-          {TRANSACTION_STATUS_LABELS[tx.status] ?? tx.status}
-        </span>
-      </td>
-      <td className="px-3 py-3 text-sm text-gray-600">
-        {tx.items && tx.items.length > 0 ? (
-          tx.items.map((i: { item_name: string }) => i.item_name).join(', ')
-        ) : (
-          <span className="text-gray-400">--</span>
-        )}
-      </td>
-      {/* Session #156 NEW Tip column. Conditional `---` when tip = 0 per
+      {/* Session #156 Tip column. Conditional `---` when tip = 0 per
           operator decision #4 — keeps visual noise low; tip-bearing rows
           stand out. */}
       <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-gray-700">
@@ -825,6 +859,17 @@ function TransactionTableRow({
           </div>
         )}
       </td>
+      {/* Session #157: Status column moved to rightmost slot per operator
+          column reorder. Cell renderer unchanged. */}
+      <td className="whitespace-nowrap px-3 py-3">
+        <span
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+            STATUS_BADGE_CLASSES[tx.status] ?? 'bg-gray-100 text-gray-500'
+          }`}
+        >
+          {TRANSACTION_STATUS_LABELS[tx.status] ?? tx.status}
+        </span>
+      </td>
     </tr>
   );
 }
@@ -846,20 +891,22 @@ function ExportButton({
   appointmentTotalsByApptId: Map<string, number>;
 }) {
   const handleExport = useCallback(() => {
-    // Session #156: column order matches Option B layout in the on-screen
-    // table — Date | Receipt # | Customer | Employee | Method | Status |
-    // Services | Tip | Total. Tip column NEW; Total column now reflects
-    // the canonical receipt-equivalent formula.
+    // Session #157: column order mirrors the on-screen reorder — Date |
+    // Receipt # | Customer | Services | Employee | Detailer | Method |
+    // Tip | Total | Status. Detailer column NEW; Status moves to the
+    // rightmost slot. Total column still reflects the canonical receipt-
+    // equivalent formula from Session #156.
     const headers = [
       'Date',
       'Receipt #',
       'Customer',
-      'Employee',
-      'Method',
-      'Status',
       'Services',
+      'Employee',
+      'Detailer',
+      'Method',
       'Tip',
       'Total',
+      'Status',
     ];
 
     const rows = transactions.map((tx) => {
@@ -871,20 +918,29 @@ function ExportButton({
       const canonicalTotal =
         Math.max(appointmentTotal ?? 0, tx.total_amount) + (tx.tip_amount ?? 0);
 
+      // Session #157: detailer first name from the first non-cancelled
+      // job; mirrors the on-screen cell derivation in
+      // <TransactionTableRow>. Empty string when no job / no assigned
+      // staff so the CSV cell stays empty (consistent with other
+      // optional-data CSV cells like Method).
+      const detailerFirstName =
+        tx.jobs?.find((j) => j.status !== 'cancelled')?.assigned_staff?.first_name ?? '';
+
       return [
         tx.transaction_date ? new Date(tx.transaction_date).toLocaleString() : '',
         tx.receipt_number ?? '',
         tx.customer ? `${tx.customer.first_name} ${tx.customer.last_name}` : 'Walk-in',
+        tx.items?.map((i: { item_name: string }) => i.item_name).join('; ') || '',
         tx.employee
           ? `${tx.employee.first_name} ${tx.employee.last_name}`
           : tx.appointment_id
             ? 'Online Booking'
             : '',
+        detailerFirstName,
         tx.payment_method ?? '',
-        tx.status,
-        tx.items?.map((i: { item_name: string }) => i.item_name).join('; ') || '',
         (tx.tip_amount ?? 0).toFixed(2),
         canonicalTotal.toFixed(2),
+        tx.status,
       ];
     });
 
