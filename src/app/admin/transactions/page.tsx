@@ -342,24 +342,29 @@ export default function AdminTransactionsPage() {
         } else {
           const rows = (data as unknown as TransactionRow[]) ?? [];
           setTransactions(rows);
-          // Batched lookup of appointment.total_amount for close-out rows so
-          // the list can show "$0.00 / ($X.XX paid to appt)" without an
-          // N+1 fetch per row. Walk-in / non-close-out rows are skipped.
-          const closeOutApptIds = Array.from(
+          // Session #156 (Item 3 Adjacent-4 fix): widened from close-out-only
+          // to ALL rows with `appointment_id`. The canonical Total formula
+          // `Math.max(appointment.total_amount, total_amount) + tip_amount`
+          // needs appointment.total_amount available for every appointment-
+          // linked row (deposit, balance, close-out shell) — not just
+          // close-out shells. The "($X.XX paid to appt)" subtitle still
+          // gates on the close-out-shell marker `notes === 'Closed out —
+          // fully pre-paid'` at the row-render site to preserve that
+          // affordance's narrow semantic. Walk-in / non-appointment rows
+          // are skipped (no map entry). Single batched query mirrors the
+          // pre-#156 shape; only the filter widens.
+          const appointmentLinkedApptIds = Array.from(
             new Set(
               rows
-                .filter(
-                  (r) =>
-                    r.notes === 'Closed out — fully pre-paid' && r.appointment_id
-                )
+                .filter((r) => !!r.appointment_id)
                 .map((r) => r.appointment_id as string)
             )
           );
-          if (closeOutApptIds.length > 0) {
+          if (appointmentLinkedApptIds.length > 0) {
             const { data: appts } = await supabase
               .from('appointments')
               .select('id, total_amount')
-              .in('id', closeOutApptIds);
+              .in('id', appointmentLinkedApptIds);
             const map = new Map<string, number>();
             for (const a of appts ?? []) {
               map.set(a.id as string, Number(a.total_amount));
@@ -568,13 +573,27 @@ export default function AdminTransactionsPage() {
                   Showing {startIndex + 1}-
                   {Math.min(startIndex + PAGE_SIZE, totalCount)} of {totalCount}
                 </p>
-                {canExport && <ExportButton transactions={transactions} />}
+                {canExport && (
+                  <ExportButton
+                    transactions={transactions}
+                    appointmentTotalsByApptId={appointmentTotalsByApptId}
+                  />
+                )}
               </div>
 
               {/* Table */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
+                    {/* Session #156 (Item 3 Adjacent-4 fix): column order
+                        switched to Option B — Date | Receipt # | Customer
+                        | Employee | Method | Status | Services | Tip |
+                        Total. Services-Tip-Total now form a contiguous
+                        right-aligned financial cluster mirroring the
+                        receipt's spatial layout (line items → tip line →
+                        TOTAL). Customer widened 144px → 180px to hold
+                        longer real-world names without truncation. Tip
+                        column NEW (80px); not sortable per operator lock. */}
                     <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       <th
                         className="px-3 py-3 w-[72px] cursor-pointer select-none"
@@ -592,11 +611,12 @@ export default function AdminTransactionsPage() {
                           Receipt # <SortIndicator column="receipt_number" />
                         </div>
                       </th>
-                      <th className="px-3 py-3 w-[144px]">Customer</th>
-                      <th className="px-3 py-3">Services</th>
+                      <th className="px-3 py-3 w-[180px]">Customer</th>
                       <th className="px-3 py-3 w-[100px]">Employee</th>
                       <th className="px-3 py-3 w-[70px]">Method</th>
                       <th className="px-3 py-3 w-[90px]">Status</th>
+                      <th className="px-3 py-3">Services</th>
+                      <th className="px-3 py-3 w-[80px] text-right">Tip</th>
                       <th
                         className="px-3 py-3 w-[80px] text-right cursor-pointer select-none"
                         onClick={() => handleHeaderSort('total_amount')}
@@ -613,8 +633,14 @@ export default function AdminTransactionsPage() {
                         key={tx.id}
                         tx={tx}
                         onReceiptClick={() => setReceiptTransactionId(tx.id)}
-                        appointmentGross={
-                          tx.notes === 'Closed out — fully pre-paid' && tx.appointment_id
+                        appointmentTotal={
+                          // Session #156 (Item 3 Adjacent-4 fix): pass the
+                          // appointment.total_amount for ANY appointment-
+                          // linked row (not just close-out shells) so the
+                          // canonical Total formula can apply uniformly.
+                          // Close-out-shell subtitle remains gated narrowly
+                          // inside the row renderer on the notes marker.
+                          tx.appointment_id
                             ? appointmentTotalsByApptId.get(tx.appointment_id) ?? null
                             : null
                         }
@@ -672,15 +698,37 @@ export default function AdminTransactionsPage() {
 function TransactionTableRow({
   tx,
   onReceiptClick,
-  appointmentGross,
+  appointmentTotal,
 }: {
   tx: TransactionRow;
   onReceiptClick: () => void;
-  /** Set only when this row is a close-out and the parent loaded the
-   * appointment.total_amount. Renders the "($X.XX paid to appt)" subtitle
-   * under the $0.00 total so list scans show real revenue, not zeros. */
-  appointmentGross: number | null;
+  /** Session #156 (Item 3 Adjacent-4 fix): appointment.total_amount for any
+   * appointment-linked row (deposit, balance, close-out shell). Drives the
+   * canonical Total formula `Math.max(appointmentTotal ?? 0, total_amount)
+   * + tip_amount` — matches the receipt's TOTAL semantics (Session #155
+   * detail-view fix mirrored here). NULL for walk-in / non-appointment
+   * rows; Math.max degrades to total_amount in that case. */
+  appointmentTotal: number | null;
 }) {
+  // Session #156: canonical Total formula mirroring
+  // `src/app/pos/components/transactions/transaction-detail.tsx:393`
+  // (Session #155 / commit b91bccac) and the receipt-template rule at
+  // `src/app/pos/lib/receipt-template.ts:723+:1482`.
+  const canonicalTotal =
+    Math.max(appointmentTotal ?? 0, tx.total_amount) + (tx.tip_amount ?? 0);
+
+  // Subtitle gates narrowly on the close-out-shell marker, per operator
+  // decision #5: preserves the affordance distinguishing close-out shells
+  // from real-revenue rows when the total_amount column reads $0 on the
+  // raw row even though the canonical Total now renders the receipt total.
+  const isCloseOutShell =
+    tx.notes === 'Closed out — fully pre-paid' && appointmentTotal !== null;
+
+  // Customer full-name string for hover-tooltip on truncate.
+  const customerFullName = tx.customer
+    ? `${tx.customer.first_name} ${tx.customer.last_name}`.trim()
+    : null;
+
   return (
     <tr className="transition-colors hover:bg-gray-50">
       <td className="whitespace-nowrap px-3 py-3 text-gray-600" title={formatDateTime(tx.transaction_date)}>
@@ -699,23 +747,20 @@ function TransactionTableRow({
           <span className="text-gray-400">---</span>
         )}
       </td>
-      <td className="px-3 py-3 max-w-[144px] truncate">
+      {/* Session #156: Customer widened 144 → 180px + title tooltip on
+          truncate so operators can read the full name without click-through
+          when a name overruns the cell. */}
+      <td className="px-3 py-3 max-w-[180px] truncate">
         {tx.customer ? (
           <a
             href={`/admin/customers/${tx.customer.id}`}
+            title={customerFullName ?? undefined}
             className="text-blue-600 hover:text-blue-800 hover:underline"
           >
             {tx.customer.first_name} {tx.customer.last_name}
           </a>
         ) : (
           <span className="text-gray-600">Walk-in</span>
-        )}
-      </td>
-      <td className="px-3 py-3 text-sm text-gray-600">
-        {tx.items && tx.items.length > 0 ? (
-          tx.items.map((i: { item_name: string }) => i.item_name).join(', ')
-        ) : (
-          <span className="text-gray-400">--</span>
         )}
       </td>
       <td className="px-3 py-3 max-w-[100px] truncate">
@@ -746,11 +791,37 @@ function TransactionTableRow({
           {TRANSACTION_STATUS_LABELS[tx.status] ?? tx.status}
         </span>
       </td>
+      <td className="px-3 py-3 text-sm text-gray-600">
+        {tx.items && tx.items.length > 0 ? (
+          tx.items.map((i: { item_name: string }) => i.item_name).join(', ')
+        ) : (
+          <span className="text-gray-400">--</span>
+        )}
+      </td>
+      {/* Session #156 NEW Tip column. Conditional `---` when tip = 0 per
+          operator decision #4 — keeps visual noise low; tip-bearing rows
+          stand out. */}
+      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-gray-700">
+        {tx.tip_amount > 0 ? (
+          formatCurrency(tx.tip_amount)
+        ) : (
+          <span className="text-gray-400">---</span>
+        )}
+      </td>
       <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-gray-900">
-        {formatCurrency(tx.total_amount)}
-        {appointmentGross !== null && (
+        {/* Session #156 (Item 3 Adjacent-4 fix): canonical Total formula
+            mirrors thermal/email-HTML/SMS-link-public-page/browser-print/
+            print-copier/detail-view byte-equivalently. Pre-fix this rendered
+            `formatCurrency(tx.total_amount)` only — for the SD-006297
+            balance-payment case (`total_amount=$230, tip=$92,
+            appointment.total_amount=$460`) the list displayed `$230.00`
+            while the receipt printed `$552.00` — an S0 operator-visible
+            reconciliation hazard with reach across every tip-bearing row.
+            Audit: docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md (Adjacent-4). */}
+        {formatCurrency(canonicalTotal)}
+        {isCloseOutShell && (
           <div className="text-xs font-normal text-gray-500">
-            ({formatCurrency(appointmentGross)} paid to appt)
+            ({formatCurrency(appointmentTotal!)} paid to appt)
           </div>
         )}
       </td>
@@ -762,24 +833,60 @@ function TransactionTableRow({
 // CSV Export Button
 // ---------------------------------------------------------------------------
 
-function ExportButton({ transactions }: { transactions: TransactionRow[] }) {
+function ExportButton({
+  transactions,
+  appointmentTotalsByApptId,
+}: {
+  transactions: TransactionRow[];
+  /** Session #156 (Item 3 Adjacent-4 fix): same map the list view uses,
+   * threaded through so CSV's Total column applies the canonical formula
+   * `Math.max(appointment.total_amount, total_amount) + tip_amount`. Without
+   * this, the CSV export carried the pre-fix bug and downstream spreadsheet
+   * / QBO reconciliation pulled the wrong amount per row. */
+  appointmentTotalsByApptId: Map<string, number>;
+}) {
   const handleExport = useCallback(() => {
-    const headers = ['Date', 'Receipt #', 'Customer', 'Services', 'Employee', 'Method', 'Status', 'Total'];
+    // Session #156: column order matches Option B layout in the on-screen
+    // table — Date | Receipt # | Customer | Employee | Method | Status |
+    // Services | Tip | Total. Tip column NEW; Total column now reflects
+    // the canonical receipt-equivalent formula.
+    const headers = [
+      'Date',
+      'Receipt #',
+      'Customer',
+      'Employee',
+      'Method',
+      'Status',
+      'Services',
+      'Tip',
+      'Total',
+    ];
 
-    const rows = transactions.map((tx) => [
-      tx.transaction_date ? new Date(tx.transaction_date).toLocaleString() : '',
-      tx.receipt_number ?? '',
-      tx.customer
-        ? `${tx.customer.first_name} ${tx.customer.last_name}`
-        : 'Walk-in',
-      tx.items?.map((i: { item_name: string }) => i.item_name).join('; ') || '',
-      tx.employee
-        ? `${tx.employee.first_name} ${tx.employee.last_name}`
-        : tx.appointment_id ? 'Online Booking' : '',
-      tx.payment_method ?? '',
-      tx.status,
-      tx.total_amount.toFixed(2),
-    ]);
+    const rows = transactions.map((tx) => {
+      const appointmentTotal = tx.appointment_id
+        ? appointmentTotalsByApptId.get(tx.appointment_id) ?? null
+        : null;
+      // Canonical Total — mirrors the on-screen Total cell + receipt
+      // template + detail-view fix from Session #155.
+      const canonicalTotal =
+        Math.max(appointmentTotal ?? 0, tx.total_amount) + (tx.tip_amount ?? 0);
+
+      return [
+        tx.transaction_date ? new Date(tx.transaction_date).toLocaleString() : '',
+        tx.receipt_number ?? '',
+        tx.customer ? `${tx.customer.first_name} ${tx.customer.last_name}` : 'Walk-in',
+        tx.employee
+          ? `${tx.employee.first_name} ${tx.employee.last_name}`
+          : tx.appointment_id
+            ? 'Online Booking'
+            : '',
+        tx.payment_method ?? '',
+        tx.status,
+        tx.items?.map((i: { item_name: string }) => i.item_name).join('; ') || '',
+        (tx.tip_amount ?? 0).toFixed(2),
+        canonicalTotal.toFixed(2),
+      ];
+    });
 
     const escapeCsvField = (field: string): string => {
       if (field.includes(',') || field.includes('"') || field.includes('\n')) {
@@ -802,7 +909,11 @@ function ExportButton({ transactions }: { transactions: TransactionRow[] }) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [transactions]);
+    // Session #156: `appointmentTotalsByApptId` added to deps since the
+    // canonical Total formula consults it per-row. Without this, a re-fetch
+    // that widens the map (new appointment-linked rows joining the visible
+    // page) would not re-bind handleExport — CSV would carry stale values.
+  }, [transactions, appointmentTotalsByApptId]);
 
   return (
     <Button variant="outline" size="sm" onClick={handleExport}>

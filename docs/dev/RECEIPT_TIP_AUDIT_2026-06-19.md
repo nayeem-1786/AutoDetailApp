@@ -139,6 +139,22 @@ These were uncovered during the audit pass but are not part of the operator-lock
 | Verdict | ✅ Correct by construction — `appointments.total_amount` is the appointment's contracted/quoted total; tip is a transaction-time artifact and does not belong on the appointment-level summary. |
 | Recommended | No fix. |
 
+### Adjacent-4 — Admin Transactions LIST view + CSV export
+
+> **Status (added + RESOLVED in Session #156, 2026-06-19):** Surfaced by an operator-driven column-audit follow-up the same day as Session #155's detail-view fix. **Same bug class as Surface D; broader operational reach** (the list view is the daily-reconciliation entry point; detail view is one click deeper). Closed in Session #156's bundled commit (column-restructure + Surface D' fix + CSV export fix).
+
+| Field | Value |
+|---|---|
+| File | `src/app/admin/transactions/page.tsx:750` (on-screen Total cell, pre-#156) + `:781` (CSV export Total value, pre-#156) |
+| Render site | Two: (1) `<TransactionTableRow>` Total `<td>` (on-screen), (2) `ExportButton.handleExport()` row body (CSV) |
+| Tip data path | `tx.tip_amount` already on the row via SELECT `*` at `page.tsx:242`. Pre-#156 the value was UNUSED — list view showed no tip column anywhere, CSV exported no Tip header. |
+| Conditional (Tip cell) | NEW Session #156 — `tx.tip_amount > 0` renders `formatCurrency(tx.tip_amount)`, else `---`. Operator-locked decision #4. |
+| Tip in TOTAL | **❌ Pre-#156 NO — same bug as Surface D.** Total rendered `formatCurrency(tx.total_amount)` only. For the real-world SD-006297 balance-payment shape (`total_amount=$230, tip=$92, appointment.total_amount=$460`), the list view displayed `$230.00` while the receipt printed `$552.00` — operator-visible $322 reconciliation discrepancy. |
+| Verdict (pre-#156) | ⚠️ Renders with bug — **S0**. Larger reach than Surface D: every tip-bearing row in the table + every row of the CSV export. |
+| Severity | **S0** (matches Session #155 detail-view fix; same bug class, larger reach). |
+| Fix shape | Mirrors Session #155 canonical formula: `Math.max(appointmentTotal ?? 0, tx.total_amount) + (tx.tip_amount ?? 0)`. Implementation routed via the existing `appointmentTotalsByApptId` map — widened from close-out-only to ALL appointment-linked rows; no SELECT extension needed (unlike Session #155's detail-route fix, which added a PostgREST embed). Map threaded through to `<ExportButton>` so CSV applies the same canonical formula. |
+| **Verdict (post-#156)** | ✅ **RESOLVED.** Bundled with the Option B column restructure (Date \| Receipt # \| Customer \| Employee \| Method \| Status \| Services \| Tip \| Total), Customer column width 144→180 + tooltip, and corrective note for the Session #155 narrative misstatement (see CHANGELOG Corrections). |
+
 ---
 
 ## 4. Aggregate findings

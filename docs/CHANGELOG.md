@@ -6,6 +6,68 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 3 Adjacent-4 — Admin Transactions LIST view + CSV export tip fix + Option B column restructure (2026-06-19, Session #156)
+
+**Operator-driven follow-up the same day as Session #155.** A column-audit pass on `src/app/admin/transactions/page.tsx` exposed that the LIST view (the daily-reconciliation entry point) shares the **same canonical-Total bug** as the DETAIL view we closed in Session #155 — but with broader operational reach. The fix mirrors Session #155 byte-equivalently for the on-screen Total cell + CSV export, and bundles in an operator-locked column restructure (Option B) + Customer width + new Tip column + audit-doc Adjacent-4 entry. **CORRECTIONS** sub-section below also addresses my Session #155 narrative misstatement ($460 → $230 corrected).
+
+### Audit follow-up — Adjacent-4 added to RECEIPT_TIP_AUDIT_2026-06-19.md
+
+Session #155's audit matrix used "Internal admin Transactions view" as a single row pointing to the DETAIL page (`pos/components/transactions/transaction-detail.tsx`). It missed the sibling LIST page (`admin/transactions/page.tsx:750`) + CSV export (`:781`), both of which carried the same bug pattern with broader reach (every tip-bearing row in the table, every row in CSV exports → downstream spreadsheet/QBO reconciliation pulled wrong amounts).
+
+Adjacent-4 row appended to the audit doc this session and marked RESOLVED in the same commit.
+
+### Fixed
+
+- **Admin Transactions LIST view — on-screen Total cell now includes tip (S0).** `src/app/admin/transactions/page.tsx:750` (pre-#156 line) was rendering `formatCurrency(tx.total_amount)` without `+ tip_amount`. For the SD-006297 balance-payment shape (`total_amount=$230, tip=$92, appointment.total_amount=$460`) the list displayed `$230.00` while the receipt printed `$552.00` — a $322 operator-visible reconciliation hazard with reach across every tip-bearing row in the table. Now uses the canonical formula `Math.max(appointmentTotal ?? 0, tx.total_amount) + (tx.tip_amount ?? 0)`, byte-equivalent to the Session #155 detail-view fix (`transaction-detail.tsx:393`) and the receipt-template formula at `pos/lib/receipt-template.ts:723` / `:1482` / `(public)/receipt/[token]/page.tsx:361`.
+- **Admin Transactions CSV export — Total column now includes tip (S0, same bug class).** `ExportButton.handleExport()` at `page.tsx:781` (pre-#156 line) was writing `tx.total_amount.toFixed(2)` to the Total column. Spreadsheet / QBO reconciliation pulled the wrong amount per row. CSV now writes `canonicalTotal.toFixed(2)` using the same formula as the on-screen cell; a new `Tip` column is inserted before `Total` so the underlying tip amount is also reconcilable downstream.
+- **Appointment-totals map widened from close-out-only to all-appointment-linked rows.** The pre-#156 `closeOutApptIds` filter at `page.tsx:348` populated `appointmentTotalsByApptId` only for `notes === 'Closed out — fully pre-paid'` rows; the canonical formula needs appointment.total_amount available for EVERY appointment-linked row (deposit, balance, close-out shell). Filter widened to `!!r.appointment_id`. Single batched query shape unchanged; only the candidate-id filter widens. The "($X.XX paid to appt)" subtitle's narrow gating on `tx.notes === 'Closed out — fully pre-paid'` is preserved at the row-render site (operator decision #5) — the marker-based affordance distinguishing close-out shells from real-revenue rows survives intact even though the bold Total now renders the canonical receipt-equivalent value.
+
+### Changed — column layout (Option B, operator-locked)
+
+- **Column order restructured** to Option B: `Date | Receipt # | Customer | Employee | Method | Status | Services | Tip | Total`. Services-Tip-Total now form a contiguous right-aligned financial cluster mirroring the receipt's spatial layout (line items → tip line → TOTAL). Pre-#156 layout was: `Date | Receipt # | Customer | Services | Employee | Method | Status | Total`. CSV export header sequence mirrors the new on-screen order.
+- **Customer column widened** from `w-[144px]` → `w-[180px]` (header + cell `max-w-[180px]`). Added `title={customerFullName ?? undefined}` tooltip on the `<a>` link so operators with longer hyphenated/compound names can read the full name on hover without click-through. Operator-locked decision #10.
+- **NEW Tip column** at `w-[80px]` text-right, between Status and Total. Not sortable per operator decision #3 (date / receipt # / total remain the only sortable columns). Tip cell renders `formatCurrency(tx.tip_amount)` when `tx.tip_amount > 0`, `---` placeholder otherwise (operator decision #4) — keeps visual noise low so tip-bearing rows stand out.
+
+### Corrections
+
+- **Session #155 ($460 → $230 misstatement)**: In Session #155's CHANGELOG and ROADMAP entries (already shipped at commit `b91bccac`, now on origin/main), I wrote that the POS admin Transactions DETAIL view "rendered Total = $460" pre-fix for receipt #SD-006297. **This was wrong.** The actual pre-fix display was `$230` (the close-out transaction's `tx.total_amount` = the in-store balance customer paid), not `$460`. The pre-fix-to-receipt delta was therefore $552 − $230 = **$322**, not the $92 I implied. The shipped fix's canonical formula `Math.max(appointment.total_amount, total_amount) + tip_amount` is unaffected by this correction — the formula produces $552 whether `total_amount` is $230 (balance-payment shape, SD-006297's real shape) or $0 (close-out-shell shape, the OTHER valid shape). The 4 regression tests shipped with `b91bccac` are unchanged in correctness; case 3 used the close-out-shell shape ($0 + $460 + $92 = $552). Case 5 added this session (see "What shipped" below) explicitly locks the balance-payment shape (SD-006297's real shape) so both branches are now anti-regression-covered. The historical record stays honest via this corrective note rather than a silent retroactive rewrite.
+
+### What shipped
+
+- **`src/app/admin/transactions/page.tsx` MOD** — three independent fixes bundled per operator's "ONE commit" instruction:
+  - **Appointment-totals scope widening** at the data-fetch site (filter changed from close-out-marker to `!!r.appointment_id`; variable renamed `closeOutApptIds` → `appointmentLinkedApptIds`)
+  - **`<TransactionTableRow>` rewrite**: new `appointmentTotal: number | null` prop replaces the narrow `appointmentGross`; derives `canonicalTotal` + `isCloseOutShell` + `customerFullName` at component head; Total cell renders the canonical value; subtitle conditional shifts to `isCloseOutShell` which still gates on the close-out-marker narrowly; NEW Tip cell between Services and Total; Customer cell `max-w-` 144→180 + title tooltip; column-order swap (Employee/Method/Status now precede Services, putting the financial cluster Services-Tip-Total on the right)
+  - **`<ExportButton>` rewrite**: new `appointmentTotalsByApptId` prop; headers array reordered to match Option B + Tip inserted before Total; row body computes `canonicalTotal` per row and emits `tx.tip_amount.toFixed(2)` + `canonicalTotal.toFixed(2)` in the right cells
+  - **Header `<thead>` block rewrite**: column order + widths swapped to Option B; NEW Tip `<th>` between Status and Total; Customer width 144→180; explanatory comment block above the `<tr>` documents Option B + width change + NEW Tip + non-sortable lock
+- **`src/app/admin/transactions/__tests__/transactions-list-tip-display.test.ts` (NEW)** — 12 regression-locking tests across 4 describe blocks. Cases 1–10 are source-string structural pins (column order matches Option B, Customer width 180 + tooltip, Tip header 80px + non-sortable + position-after-Services, Tip cell zero-state `---` conditional, canonical Total formula presence + bare-formula anti-regression, close-out-shell subtitle gate, appointment-totals map widening from close-out-only to `!!r.appointment_id`, CSV export header order, CSV row body Tip + canonical Total, ExportButton prop wiring). Cases 11–12 are formula-correctness behavioral pins for the SD-006297 balance-payment shape ($230 + $92 + $460 → $552) + close-out-shell variant ($0 + $92 + $460 → $552) and walk-in degradation ($109.75 + $20 + null → $129.75). Mirrors the source-string regression-locking pattern from Sessions #119 / #120 / #123 / #144 — the admin page is ~830 lines with deep state (useTableState + TableToolbar + supabase client + permissions + stats endpoint), so structural source-string assertions are more proportionate than a full-mount harness for the bug-localization scope.
+- **`src/app/pos/components/transactions/__tests__/transaction-detail-total-with-tip.test.tsx` MOD** — added case 5: balance-payment shape (`total_amount=$230, tip=$92, appointment.total_amount=$460 → $552`). Locks the SD-006297 REAL shape against future drift. Case 3 (pre-existing) covers the close-out-shell shape with the same canonical-output value but a different `total_amount` input ($0). Both shapes now anti-regression-covered.
+- **`docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md` MOD** — Adjacent-4 row appended with the LIST + CSV findings + RESOLVED-in-this-session marker. Adjacent-2 (portal Transaction summary card) status unchanged — still deferred per Session #155 operator decision #3.
+- **`docs/CHANGELOG.md`** — this entry (Fixed + Changed + Corrections + What shipped + Hard rules + Gates).
+- **`docs/dev/ROADMAP-13-ITEMS.md`** — Item 3 Notes/decisions log addendum for Session #156; new ledger row #156 at the top of the table (reverse-chronological).
+
+### Hard rules respected
+
+- NO scope creep into Adjacent-2 (portal Transaction summary — still deferred) or Adjacent-3 (Appointment card — correct by construction). NO new dependencies. NO migrations (UI display fix only; `transactions` schema unchanged). All changes bundled into ONE commit.
+
+### Notes — visible behavior change for deposit rows
+
+The canonical formula `Math.max(appointment.total_amount, total_amount) + tip_amount` applied uniformly to ALL rows means the deposit transaction row in the LIST view now displays the appointment gross (e.g., `$460.00`) rather than the deposit amount paid (e.g., `$230.00`) — same as the deposit RECEIPT's TOTAL line. This is consistent with what Session #155 already shipped for the deposit row in the DETAIL view. The trade-off: operator-visible per-row Total is now receipt-equivalent (good — eliminates the SD-006297 class of reconciliation hazard), but the per-row Total is no longer summable across deposit + close-out pairs of the same appointment (each row reflects the appointment gross + its own tip). Revenue stats card (`revenue-stats.tsx`) continues to sum the raw `transactions.total_amount` server-side, so totals-of-totals remain accurate. The "(X paid to appt)" subtitle on close-out-shell rows preserves the affordance distinguishing close-out shells from real-revenue rows.
+
+### Gates
+
+- **tsc:** _surfaced pre-commit_
+- **lint:** _surfaced pre-commit_
+- **vitest:** baseline + 12 new LIST-view + 1 new detail-view case 5 = **+13 (3487/3487 pass; was 3474 baseline)**
+- **build:** _surfaced pre-commit_
+
+### Wave 2 status
+
+- **Item 3:** ✅ done (#155 detail + #156 LIST/CSV); two sessions instead of one — this session was the operator-driven LIST-view follow-up. Adjacent-2 (portal Transaction summary card) remains deferred per Session #155 Q3 operator lock.
+- **Item 2** (Stripe payment-link `tip_settings`): next Wave 2 session.
+- **Item 4** (cash tip capture + splitting + reporting): largest of the trio; remains queued.
+
+---
+
 ## Item 3 — Receipt Tip Display Audit + Surface D fix (POS admin Transactions Total row) (2026-06-19, Session #155)
 
 **Audit + targeted fix bundled per Memory #29 Type 1 Targeted Audit.** Closes Item 3 of the 13-item roadmap by validating tip-line rendering across every receipt-and-transaction surface and shipping the one bug surfaced. Audit doc: `docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md` (5-surface matrix + Adjacent Surfaces section + aggregate findings).

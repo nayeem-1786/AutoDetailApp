@@ -150,10 +150,9 @@ describe('TransactionDetail — Total row tip math (Item 3 / Surface D / Session
 
   it('case 3: Total uses appointment_total via Math.max when appointment_total > total_amount (close-out shell)', async () => {
     // Close-out shell scenario: the closing transaction has $0 total
-    // (deposit covered everything in advance), but the appointment carries
-    // the gross. Canonical formula picks the larger of the two via Math.max.
-    // Receipt #SD-006297 was a real-world case of this shape with a $92 tip
-    // on a $552 appointment-total — the bug example from the audit.
+    // (deposit covered the appointment gross via a separate transaction,
+    // close-out is a $0 shell), but the appointment carries the gross.
+    // Canonical formula picks the larger of the two via Math.max.
     fetchedTransaction.value = makeTransaction({
       total_amount: 0,
       tip_amount: 92,
@@ -163,6 +162,32 @@ describe('TransactionDetail — Total row tip math (Item 3 / Surface D / Session
     await screen.findByRole('button', { name: /void transaction/i });
 
     // $460 (appointment.total_amount) + $92 (tip) = $552
+    expect(readTotalAmount()).toBe('$552.00');
+  });
+
+  it('case 5: Total uses appointment_total via Math.max in balance-payment shape (SD-006297 real-world fixture)', async () => {
+    // Session #156 add-on (per operator correction): the SD-006297 close-out
+    // is the BALANCE-PAYMENT shape — `total_amount = $230` (the in-store
+    // balance customer paid), NOT $0 (close-out shell). Both shapes flow
+    // through the same canonical formula and yield $552, but the test
+    // matrix now covers both shapes explicitly so future refactors can't
+    // silently drift on either branch.
+    //
+    // SD-006297 history:
+    //   - Customer booked services totaling $460
+    //   - Paid $230 deposit (50%) via separate deposit transaction
+    //   - At pickup, paid $230 balance + $92 tip in store → this transaction
+    //   - appointment.total_amount = $460 (the original commitment)
+    //
+    // Canonical: Math.max($460, $230) + $92 = $460 + $92 = $552
+    fetchedTransaction.value = makeTransaction({
+      total_amount: 230,
+      tip_amount: 92,
+      appointment: { total_amount: 460 },
+    });
+    render(<TransactionDetail transactionId="tx-1" onBack={() => {}} />);
+    await screen.findByRole('button', { name: /void transaction/i });
+
     expect(readTotalAmount()).toBe('$552.00');
   });
 
