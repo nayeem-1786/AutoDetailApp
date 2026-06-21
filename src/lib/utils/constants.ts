@@ -11,6 +11,37 @@ export const WATER_SKU = '0000001'; // Water product SKU (excluded from loyalty)
 
 export const CC_FEE_RATE = 0.05; // 5% CC fee deducted from card tips
 
+/**
+ * Canonical tip preset percentages for app-side tip UIs.
+ *
+ * Consumers:
+ *  - POS pre-payment tip screen (`src/app/pos/components/checkout/tip-screen.tsx`)
+ *  - POS WisePOS E single-card flow (`src/app/pos/components/checkout/card-payment.tsx`)
+ *    — fed into Stripe Terminal `tip_configuration.options`
+ *  - POS split-payment card leg (`src/app/pos/components/checkout/split-payment.tsx`)
+ *    — same Terminal `tip_configuration.options`
+ *  - Customer pay-link page tip selector (Item 2, 2026-06-20) —
+ *    `src/app/(public)/pay/[token]/pay-form.tsx`
+ *
+ * WisePOS E hardware DRIFT NOTE: the physical reader receives its tip
+ * preset percentages from the Stripe Dashboard's Terminal configuration,
+ * NOT from this constant. The Terminal `tip_configuration.options` passed
+ * by `card-payment.tsx` / `split-payment.tsx` to the JS SDK is an
+ * app-level override, but the Dashboard config is the operator's manual
+ * source of truth for the reader UX.
+ *
+ * **This constant is a manual code mirror of the Dashboard config.** When
+ * the operator changes Dashboard Terminal tip percentages, update this
+ * constant to match. Both surfaces (Dashboard + this constant) are kept
+ * in sync by operator discipline today — there is no programmatic
+ * reconciliation.
+ *
+ * Future cleanup (out of scope for Item 2): fetch tip presets from
+ * Stripe Terminal config at pay-page render OR move both surfaces to a
+ * single `business_settings` row that drives both the Terminal upload
+ * and the in-app UIs. Documented as known limitation in Item 2's
+ * CHANGELOG entry.
+ */
 export const TIP_PRESETS = [15, 20, 25] as const;
 
 export const LOYALTY = {
