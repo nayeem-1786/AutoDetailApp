@@ -6,6 +6,70 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(option-a/phase-1): helper consolidation — extract grand-total / balance-due / subtotal / loyalty-redemption helpers (no consumer migration) (2026-06-20, Session #158)
+
+> Phase 1 of the 3-phase Option A implementation arc per `docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md`. Establishes single-source-of-truth helpers for the calculations that Round 3 Section 0 identified as either duplicated-inlined-formulas (grand total, balance due) or missing-helper-with-inline-math (loyalty redemption). Phase 2 (later session) migrates the consumers to call the helpers. Phase 3 (later sessions) implements the single-transaction lifecycle on top of the now-unified calculation surface.
+>
+> **Coordinate session # with parallel Track A (Item 2 — Stripe payment-link tip).** Both worktrees branched from `84367dca`; whichever lands first gets #158, second renumbers to #159 per Memory rule on parallel-merge session-number collision.
+
+### Added — 2 new helper modules + 2 new test files (~40 tests)
+
+- **NEW `src/lib/data/transaction-totals.ts`** — four helpers in one module:
+  - `computeGrandTotal({appointment_total?, total_amount?, tip_amount?}): number` (DOLLARS) — replaces 6 inlined sites. Phase 1 audit found the 6 sites are NOT byte-identical (3 variants exist — see audit-doc Phase 1 addendum). Helper bakes in the defensive `?? 0` on tip_amount that the most-defensive variant uses, closing the latent NaN risk in Variant A (`receipt-template.ts:723`, `:1482`, `(public)/receipt/[token]/page.tsx:361`).
+  - `computeBalanceDue({appointmentTotalCents, totalPaidCents, paymentStatus?}): number` (CENTS) — replaces 3 inlined sites (`payment-link/send.ts:349`, `webhooks/stripe/route.ts:151`, `(public)/pay/[token]/page.tsx:127`). Bakes in the dual-gate semantics (`paymentStatus === 'paid' → 0`) per Q1 lock; only the pay-page currently dual-gates today, the other two consumers inherit the dual-gate via Phase 2 migration. **Asymmetric by design:** render/read callers pass `paymentStatus`; DECISION callers (webhook computing the NEW status) omit it to avoid self-reference.
+  - `deriveSubtotalFromItems(items): number` (DOLLARS) — sums `items.total_price`. Scope-limited per spec: doesn't add mobile surcharge separately (it's already a `transaction_items` row), doesn't compute tax (per-item concern). Top-of-file divergence note documents the three current write semantics (book/route.ts:662 net-of-discount, pos/transactions/route.ts:190 client-supplied, webhooks/stripe/route.ts:170 appointment snapshot) that converge under Phase 3.
+  - `computeDisplayTotals({transaction, paidSoFarDollars?, paymentStatus?}): DisplayTotals` (DOLLARS) — synthesizing surface shape that internally calls computeGrandTotal + computeBalanceDue. Returns a 10-field DisplayTotals interface (`subtotal`, `tax`, `total_discount`, `manual_discount`, `coupon_discount`, `loyalty_discount`, `tip`, `grand_total`, `paid_so_far`, `balance_due`). **Phase 1 placeholders:** `manual_discount` and `coupon_discount` always return 0 today; Phase 3 schema work (transactions.manual_discount_value + label columns) only has to POPULATE the fields — Phase 3 will not require a shape change touching every consumer. Per Q2 lock.
+
+- **NEW `src/lib/loyalty/redemption-math.ts`** — three helpers, cents-canonical:
+  - `pointsToCents(points): number` — multiplies by `LOYALTY.REDEEM_RATE_CENTS` (5 cents/point). Integer math throughout.
+  - `centsToPoints(cents, clampToBalance?): number` — Math.ceil semantics favor the customer (501 cents → 101 points, not 100); optional clamp caps at customer balance; negative clamp defensively coerced to 0.
+  - `getRedeemableRange({balancePoints, subtotalCents}): {minPoints, maxPoints}` — returns `{0, 0}` when below `LOYALTY.REDEEM_MINIMUM` (100); otherwise returns `{REDEEM_MINIMUM, min(balance-in-cents, subtotal-in-cents) → points}` floored to favor business on the cap (opposite of centsToPoints's customer-favoring ceil). Documented symmetry: customer-favoring on entry, business-favoring on cap.
+  - **Earn math intentionally OUT OF SCOPE per Q4 lock** (Phase 1.5). Server-canonical earn (pos/transactions/route.ts:510) and legacy earn endpoint (loyalty/earn/route.ts:60-61) have a discount-exclusion inconsistency that needs its own resolution.
+  - **`getActualRedemptionCents` deferred per Q3 lock** — the UX-boundary rounding logic from loyalty-panel.tsx:70-72 stays at the consumer site; this module is pure math.
+
+- **NEW `src/lib/data/__tests__/transaction-totals.test.ts`** — 25 tests covering all 4 helpers:
+  - `computeGrandTotal` (6 cases): canonical SD-006297 fixture ($460+$230+$92 → $552), close-out shell ($0 + $460 → $552), walk-in fallback, zero-tip, **null-safety for absent tip (the Variant A NaN guard)**, all-null returns 0.
+  - `computeBalanceDue` (8 cases): pure math at partial/exact/overpaid/unpaid; dual-gate=paid forces 0; dual-gate=partial passes through; webhook-pattern omit-paymentStatus; paymentStatus=null treated identically to omitted.
+  - `deriveSubtotalFromItems` (5 cases): empty, single, multiple, mobile-fee row mixed in, null/undefined defensive coerce.
+  - `computeDisplayTotals` (6 cases): basic no-payments → balance=grand_total; with partial payment; overpaid clamp; dual-gate; loyalty surfaced with placeholders staying 0; empty-tx all-zero; **cents-conversion boundary test using real SD-006297 fixture** (no IEEE drift on $230/$460/$92).
+
+- **NEW `src/lib/loyalty/__tests__/redemption-math.test.ts`** — 15 tests covering all 3 helpers:
+  - `pointsToCents` (3 cases): 0 → 0, 100 → 500 (anchored against LOYALTY constant), 1 → 5 (the atom).
+  - `centsToPoints` no clamp (3 cases): 500 → 100 exact, 501 → 101 Math.ceil-favors-customer documented inline, 0 → 0.
+  - `centsToPoints` with clamp (3 cases): clamp binds (request > balance), clamp doesn't bind (request < balance), negative clamp defensively coerced.
+  - `getRedeemableRange` (5 cases): below REDEEM_MINIMUM returns {0,0} (UI disable signal); at-min with large ticket; large balance + small ticket (ticket cap binds); mid-balance + large ticket (balance cap binds); fractional-points-on-subtotal-cap Math.floor symmetry test with documented contract (maxPoints < minPoints when subtotal forces it — UI effectively-disabled state).
+
+### Changed
+
+- **`docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md`** — appended Phase 1 addendum at the bottom of the doc (not a rewrite). Documents the 3-variant grand-total finding (Round 3 Section 0 row 1 claimed "all 6 sites match byte-identical" — Phase 1 audit found 3 distinct variants with Variant A having a latent NaN risk). The defensive `?? 0` in `computeGrandTotal` closes that risk. Phase 2 migration unifies all three variants to the helper call.
+
+### What was NOT touched (intentional)
+
+- **Zero consumer migrations.** All 6 grand-total inline sites, the 3 balance-due inline sites, the 3 subtotal write sites, and the loyalty redemption inline sites remain on inline math. Phase 2 (separate session) is the consumer-migration arc.
+- **`src/lib/payment-link/send.ts`** and **`src/app/api/webhooks/stripe/route.ts`** — explicit avoidance per parallel-session coordination with Track A (Item 2 — Stripe payment-link tip). Reading both files for the audit is fine; modifying them is not.
+- **`src/lib/data/receipt-composer.ts`** — Phase 2 will extend `composeReceiptPaymentLines()` to use the new helpers; Phase 1 leaves it untouched.
+- **No schema changes.** `transactions.manual_discount_value` and `manual_discount_label` columns (per audit Phase 1 plan) are Phase 3 work; Phase 1's placeholder fields in `DisplayTotals` interface reserve the shape so Phase 3 only populates.
+- **No behavior changes anywhere.** All NEW code is helper modules + tests; no existing code paths invoke the helpers yet.
+
+### Hard rules respected
+
+- NO new dependencies. NO migrations. NO schema changes. NO consumer migrations (Phase 2). NO touching `lib/payment-link/send.ts` or `webhooks/stripe/route.ts` (parallel Item 2 work). NO behavior changes anywhere — only NEW helper code. Memory #8 ceiling respected: 4 NEW files + 3 doc MOD = 7 file touches, well under the 4-file-net-NEW-code threshold (the test files match their helpers 1:1; doc files are doc-only).
+
+### Gates
+
+- **tsc:** 3 baseline preserved (`customer-accept-service.test.ts:44,49,73` TS2556 unchanged per Memory #29). No new errors.
+- **lint:** 101 problems total (0 errors, 101 warnings). Zero warnings in the new files (verified via grep). No new pre-existing warnings introduced.
+- **vitest:** 3534/3600 (was 3494/3560 at Session #157; +40 net new from the 25 transaction-totals + 15 redemption-math cases). 66 skipped unchanged.
+- **build:** clean.
+
+### Next phases
+
+- **Phase 1.5** — earn-math extraction + legacy `loyalty/earn/route.ts` consistency fix (separate session, scoped per Q4 lock).
+- **Phase 2** — consumer migration: rewrite the 6 grand-total sites, 3 balance-due sites, 3 subtotal-write sites, and 5+ loyalty-math sites to call the new helpers. Atomic commits per consumer family.
+- **Phase 3** — single-transaction lifecycle (Option A proper): `status='open'` at booking, `UPDATE` at close-out, payments accumulate on the one row. Includes the `transactions.manual_discount_value/label` schema migration that activates the DisplayTotals placeholder fields.
+
+---
+
 ## feat(admin): Transactions LIST — add Detailer column + Receipt # 84 + #157 column reorder (2026-06-20, Session #157)
 
 Operator-driven UX iteration the day after Session #156. Adds a new Detailer column surfacing the assigned detailer per row, widens Receipt # for headroom on longer formats, and reorders columns to put Status at the rightmost slot with Services moved back near Customer. Not a tip-display fix (the Session #156 Adjacent-4 work is unchanged in behavior); this is column-layout iteration on top of the same canonical-Total foundation.
