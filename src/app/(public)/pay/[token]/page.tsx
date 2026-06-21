@@ -397,7 +397,17 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
       ) : isProcessing ? (
         <ProcessingCard token={token} retryCount={retryCount} />
       ) : (
-        <PayForm token={token} amountDueCents={chargeCents} />
+        <PayForm
+          token={token}
+          amountDueCents={chargeCents}
+          // Item 2 — tip selector renders only on full-payment links.
+          // Defined identically to the server-side gate in
+          // `src/app/api/pay/[token]/intent/route.ts`: `payment_link_amount_cents`
+          // either NULL (operator chose "full remaining") OR ≥ remaining
+          // (link was partial when issued but remaining shrunk in-store so
+          // it's now effectively full).
+          isFullPayment={!isPartialLink}
+        />
       )}
     </div>
   );

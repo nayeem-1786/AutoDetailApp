@@ -6,6 +6,82 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(pay-link): Item 2 — Tip on full-payment Stripe payment link (Path Y) (2026-06-20, Session #159)
+
+Wave 2 Item 2 ships, completing the Wave-2 tip cluster's second of three items (Items 3 + 2 done; Item 4 cash-tip remains). **Tip selector on the customer-facing pay-link page, gated to full-payment links only.** Single-session ship per the roadmap Path A boundary, sized to the original 1-medium-session estimate.
+
+### Architecture audit finding — pre-implementation
+
+The roadmap's acceptance criteria were written assuming Stripe's **hosted Payment Links product** (`stripe.paymentLinks.create({ tip_settings })` with Dashboard-configured presets). The codebase actually uses **`stripe.paymentIntents.create()` + Stripe Elements on a custom in-app `/pay/[token]` page** — `tip_settings` has no equivalent on PaymentIntents. Operator-locked **Path Y** at audit gate: build the tip selector on the existing custom pay page (chip presets in code, captured into PI metadata, written by webhook to `transactions.tip_amount` + `payments.tip_amount`). Path X (migrate to hosted Payment Links — Stripe-hosted redirect, dark-theme + brand-lime UX loss, reshapes `payment_link_amount_cents` per-link plumbing) was rejected as a much-larger ship (4–6 sessions) inconsistent with Item 2's tactical scope.
+
+### Added
+
+- **Tip chip selector on `/pay/[token]`** — full-payment links only. Renders three preset chips (15% / 20% / 25% — values import from canonical `TIP_PRESETS` in `src/lib/utils/constants.ts`, the same constant the POS WisePOS E flow and POS tip-screen consume), one Custom dollar input chip, plus a "No Tip" button. Live total math under the selector reflects `amount due + tip = total`. Dark theme + brand-lime accent (matches existing pay-page chrome; intentionally distinct from POS's light-blue chip styling).
+- **Two-step UX on full-payment links** — page shows the tip selector first; Stripe Elements card form is deferred until the customer clicks "Continue to Payment" (or "No Tip" — one-click commit, skips the in-between review). This avoids creating a PaymentIntent on initial page load that doesn't yet know the tip; single PI per visit with the final amount, no Stripe `paymentIntents.update()` lifecycle complexity.
+- **Server-side tip validation chain** (`POST /api/pay/[token]/intent`) — accepts optional `tipCents: number` in body. 422 on non-integer / negative / non-number; 422 on partial-payment links carrying `tipCents > 0` (defense-in-depth on top of the client-side gate); 422 on tip exceeding 100% of charge (Custom-input fat-finger ceiling); 400 on malformed JSON body. Body is optional — no body = legacy auto-mount path, no behavior change.
+- **PI metadata contract** — `metadata.tip_cents` (string per Stripe metadata constraints) stamped when tip > 0; omitted when 0 so no-tip PIs stay clean in the Stripe Dashboard. Webhook reads this field and defaults to 0 when absent — forward-compatible with in-flight PIs created before this ship.
+- **Webhook tip extraction + write** (`payment_intent.succeeded` → `appointment_payment_link` branch) — `pi.metadata.tip_cents` → `transactions.tip_amount` + `payments.tip_amount` (gross) + `payments.tip_net` (after 5% CC fee deduction, mirrors POS convention at `/api/pos/transactions/route.ts:381-388`). `payments.amount` now writes the **subtotal portion** (service amount only), not the full PI amount — matches the POS `payments.amount = subtotal-only` convention so future remaining-balance math is consistent across both surfaces. Historical pay-link rows shipped with `tip_amount=0` so `amount == subtotal` trivially — **no data migration needed**, going-forward only.
+
+### Changed
+
+- **`transactions.tip_amount` + `payments.tip_amount`** on the pay-link branch — was hardcoded `0`, now sourced from `pi.metadata.tip_cents`. `transactions.total_amount` semantics unchanged (still what was charged this txn = subtotal + tip). `transactions.subtotal` semantics unchanged (still `appt.total_amount`).
+- **`payments.amount`** on the pay-link branch — was `amountReceivedDollars` (full PI amount), now `subtotalDollars` (service portion only). Equivalent on historical rows since `tip_amount=0` everywhere; semantically aligned with POS convention going forward.
+- **`payment_status` flip math** — now `subtotalCents >= remainingCents ? 'paid' : 'partial'` (was `amountReceivedCents >= remainingCents`). Tip never counts toward outstanding balance. Outcome unchanged on no-tip flows; correct for tip flows where customer pays `subtotal + tip` on a fully-outstanding appointment.
+- **`TIP_PRESETS` constant** at `src/lib/utils/constants.ts:14` — extensive JSDoc added declaring the constant as the canonical app-side source of truth for tip preset percentages. **Known limitation documented:** TIP_PRESETS is itself a manual code mirror of the operator's separate Stripe Dashboard configuration for the WisePOS E reader hardware. The reader receives presets from the Dashboard, not from this constant; the app-level `tip_configuration.options` override in POS card-payment / split-payment is fed from this constant. Operator discipline keeps the two in sync today — no programmatic reconciliation. **Future cleanup (out of scope for Item 2):** either fetch tip presets from Stripe Terminal config at render time OR move both surfaces to a `business_settings` row that drives both the Terminal upload and the in-app UIs.
+
+### What shipped
+
+- **`src/lib/utils/constants.ts` MOD** — JSDoc above `TIP_PRESETS` declaring canonical-source + Dashboard-drift note. Zero behavior change.
+- **`src/app/api/pay/[token]/intent/route.ts` MOD** — accepts optional `tipCents` body, validates (non-integer/negative/non-number reject; partial-link tip reject; > chargeCents reject; malformed JSON reject), includes in PI amount + `metadata.tip_cents`, returns `tipCents` + `totalCents` in response for client display sync.
+- **`src/app/api/webhooks/stripe/route.ts` MOD** — tip-extraction block in the `appointment_payment_link` PI sub-branch with defensive parsing (`Number.isFinite` + integer floor + non-negative + cap-at-amount_received with `console.warn` on cap); `transactions` insert payload now carries `tip_amount: tipDollars`; `payments` insert payload now carries `tip_amount: tipDollars` + `tip_net: tipDollars * (1 - CC_FEE_RATE)` + `amount: subtotalDollars`; `payment_status` math now compares subtotal vs remaining; success log line mentions `[subtotal + tip]` decomposition when tip > 0. New import: `CC_FEE_RATE` from `@/lib/utils/constants`.
+- **`src/app/(public)/pay/[token]/page.tsx` MOD** — passes `isFullPayment={!isPartialLink}` to `<PayForm>` (uses the existing `isPartialLink` boolean derived from `chargeCents < remainingCents`). Comment block documents the client-vs-server gate symmetry.
+- **`src/app/(public)/pay/[token]/pay-form.tsx` MOD** — split into `<AutoMountPayForm>` (partial-link, legacy behavior preserved) and `<DeferredMountPayForm>` (full-link, new tip-first UX). Shared `<ElementsHost>` / `<InnerForm>` / `<PreparingPanel>` / `<InitErrorPanel>` helpers extracted to avoid duplication. Tip computation pure helpers `computeTipCents` + `parseCustomCents`. InnerForm now accepts both `amountCents` (subtotal) and `tipCents` (layered on top) — a per-row decomposition renders above PaymentElement when `tipCents > 0` so the customer can confirm the breakdown before card entry.
+- **`src/app/api/webhooks/stripe/__tests__/payment-link-tip.test.ts` NEW** — 9 webhook-tip-extraction cases: no metadata (zero-write, backwards compat); valid tip → tip_amount + tip_net + payments.amount = subtotal; tip = amount_received (boundary); tip > amount_received → cap + warn; non-numeric → 0; negative → 0; fractional → floored to integer; payment_status="paid" on full-pay+tip; payment_status="partial" on under-pay+tip; regression — amount > remaining but tip-included still resolves to "paid".
+- **`src/app/api/pay/[token]/intent/__tests__/intent-tip-validation.test.ts` NEW** — 14 intent-route validation cases: no body → tip=0; valid tip=2000 → PI amount=12000 + metadata.tip_cents="2000"; tipCents=0 explicit; non-integer 422; negative 422; non-number-string 422; partial-link + tip 422; partial-link + tip=0 allowed; partial-link + no body allowed; stored amount ≥ remaining → tip allowed; tip > chargeCents 422; tip = chargeCents allowed (boundary); cancelled appt 409; already-paid bypass; malformed JSON 400; response shape (clientSecret + amountCents + tipCents + totalCents).
+- **`src/app/(public)/pay/[token]/__tests__/pay-form-tip.test.tsx` NEW** — 9 component cases: partial-link auto-mounts Stripe Elements with no tip UI; full-link renders chips + defers fetch; 20% chip → live tip + total reflect; Continue with 20% → POSTs tipCents=2000; No Tip → POSTs tipCents=0 immediately; Custom $7.50 → live total reflects; Custom empty → Continue disabled; Custom > 100% → Continue disabled; server error on Continue → surfaces message, stays on tip stage.
+- **`docs/CHANGELOG.md`** — this entry.
+- **`docs/dev/ROADMAP-13-ITEMS.md`** — Status Table flip + Roll-up bump (10 → 11 done; 9 → 8 not started) + Item 2 section status flip + new bottom-ledger row for Session #159.
+- **`docs/dev/FILE_TREE.md`** — three new test files registered + descriptors on `intent/route.ts` and `pay-form.tsx` updated to mention Item 2 extensions.
+
+### Production-code surface — over Memory #8's line target
+
+5 prod files / **~629 net lines added** vs Memory #8's ~330-line target. The pay-form rewrite carried ~420 lines of that — a structurally-necessary split into two variants (`<AutoMountPayForm>` partial-link legacy / `<DeferredMountPayForm>` full-link tip-first) plus the tip chip + Custom $ input + live math + shared `<ElementsHost>` / `<InnerForm>` / `<PreparingPanel>` / `<InitErrorPanel>` extractions. Sharing the Stripe Elements host across the two variants compressed what would otherwise have been ~600 lines of duplication into ~420 lines of shared infrastructure. Webhook + intent route additions (~166 net) carry the per-cents validation chain + metadata contract that couldn't be lifted to a helper without crossing the `lib/data/` parallel-session boundary. Constants JSDoc (+31) is documentation-as-code for the operator-known TIP_PRESETS-vs-Dashboard drift, sized to match its operational weight. **Surfaced for operator decision** — not unilaterally compressed.
+
+### Hard rules respected
+
+- **NO `lib/data/` helper touches** — parallel session is doing Option A Phase 1 helper consolidation in `lib/data/`; this session intentionally stayed out of that path.
+- NO schema changes. NO migrations. NO new dependencies. NO admin UI for tip presets (Stripe Dashboard is the operator-side source of truth for the WisePOS E hardware; app-side TIP_PRESETS constant mirrors it).
+- Tip ONLY on full-payment links (client-side gate via `isFullPayment` prop; server-side gate via the `customAmountCents == null || customAmountCents >= remainingCents` predicate in intent route; webhook-side defense via `amount_received` cap). Three layers of defense.
+- POS WisePOS E flow unchanged (operates on the same `TIP_PRESETS` constant). POS tip-screen unchanged.
+
+### Tactical-ship debt acknowledged (Path Y → future Option A Phase 3)
+
+Per the operator's architecture audit, the long-arc Option A consolidation will unify the multi-row deposit + balance + close-out transactions lifecycle into a single canonical row per appointment. **At that consolidation point, this tip will migrate from the pay-link transaction row to the unified row** — same `transactions.tip_amount` column, different row owner. Documented in the Item 2 section as known cleanup debt. No client-facing UX change at that migration point; the customer's tip still lands in `tip_amount` post-Option-A, just on a different parent row.
+
+### Gates
+
+- **tsc:** 3 baseline preserved (`customer-accept-service.test.ts:44,49,73` TS2556 unchanged). Zero new errors on the 5 modified prod files + 3 new test files.
+- **lint:** 0 new errors; 0 new warnings. The lone `intent/route.ts` `amount` warning at line 190 is pre-existing (was at line 103 before this ship; same warning carried at a different line offset). Verified by `git stash` baseline diff.
+- **vitest:** **3529 passed / 66 skipped (was 3494 baseline at Session #157; +35 new from the three new test files; 0 regressions in the existing 3494)**. Existing `payment-link-status-flip.test.ts` continues to pass without modification (additive metadata.tip_cents field is forward-compatible).
+- **build:** clean.
+
+### Not in scope (deferred / out of band)
+
+- **Migrating to Stripe-hosted Payment Links** (Path X) — would deliver Dashboard-configurable presets natively but at the cost of the custom dark-themed in-app pay UX; rejected as not aligned with Item 2's S0 tactical scope.
+- **TIP_PRESETS ↔ Stripe Dashboard reconciliation** — manual mirroring stays as-is per pre-existing condition; future cleanup options noted in the JSDoc.
+- **Tip on partial-payment links** — explicitly excluded by roadmap spec.
+- **Tip on the booking-deposit PI path** (`/api/book/payment-intent/route.ts`) — different surface; booking deposit is by definition a partial payment.
+- **Cash tip capture** — Item 4 (separate Wave 2 session).
+- **CC fee disclosure on the pay page** — POS shows "5% CC processing fee on card tips (informational)"; operator-locked this OFF for the customer-facing pay page per Q-A.1 (customer audience; fee-on-fee disclosure reads as suspicious).
+
+### UAT plan (operator runs post-deploy)
+
+1. **Full-payment tip happy path**: send pay-link from operator phone to a test appointment with the operator's "Pay in Full" preset (100% of remaining); open link on different phone; verify tip selector renders with 15% / 20% / 25% / Custom / No Tip; select 20%; verify total preview math; click "Continue to Payment"; pay with test card; verify webhook landed; query DB → confirm `transactions.tip_amount` matches the tip and `payments.tip_amount` + `payments.tip_net` (= tip × 0.95) are populated correctly.
+2. **Partial-payment no-tip path**: send a 50%-deposit pay-link; open link; verify NO tip UI renders, Stripe Elements auto-mounts (legacy behavior); pay; verify `transactions.tip_amount = 0` and behavior unchanged from pre-ship.
+3. **No Tip path**: full-payment link; click "No Tip"; verify single PI created at `chargeCents` (no tip layer); pay; verify `transactions.tip_amount = 0`.
+4. **Custom tip**: full-payment link; pick Custom; enter $5.50; verify live total preview; verify Continue disabled when input empty or > chargeCents; pay $5.50 tip; verify DB.
+5. **Receipt rendering**: confirm both a tip-bearing pay-link transaction AND a no-tip pay-link transaction render their receipts correctly (the receipt template already handles `tip_amount > 0` via the existing tip-row conditional — no template change required this ship).
+6. **WisePOS E unaffected**: run a tip-bearing card sale on the WisePOS E; verify behavior unchanged (reader still uses Dashboard presets; app-side `TIP_PRESETS` constant still mirrors them).
 ## feat(option-a/phase-1): helper consolidation — extract grand-total / balance-due / subtotal / loyalty-redemption helpers (no consumer migration) (2026-06-20, Session #158)
 
 > Phase 1 of the 3-phase Option A implementation arc per `docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md`. Establishes single-source-of-truth helpers for the calculations that Round 3 Section 0 identified as either duplicated-inlined-formulas (grand total, balance due) or missing-helper-with-inline-math (loyalty redemption). Phase 2 (later session) migrates the consumers to call the helpers. Phase 3 (later sessions) implements the single-transaction lifecycle on top of the now-unified calculation surface.

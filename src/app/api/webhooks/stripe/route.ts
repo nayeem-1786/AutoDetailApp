@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
 import { toCents, fromCents } from '@/lib/utils/money';
+import { CC_FEE_RATE } from '@/lib/utils/constants';
 import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
 import { logAudit } from '@/lib/services/audit';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -150,14 +151,58 @@ export async function POST(request: NextRequest) {
 
             const remainingCents = Math.max(0, totalCents - paidSoFarCents);
             const amountReceivedCents = pi.amount_received ?? pi.amount;
-            const newPaymentStatus = amountReceivedCents >= remainingCents ? 'paid' : 'partial';
+
+            // Item 2 (2026-06-20) — tip extraction from PI metadata. The
+            // customer pay form (`pay-form.tsx`) lets the customer pick a
+            // tip on full-payment links; intent route stamps it into
+            // `metadata.tip_cents` (string per Stripe metadata contract)
+            // alongside the inflated PI amount (`subtotal + tip`). The
+            // webhook is the sole writer of the resulting transactions /
+            // payments rows, so tip persistence happens here.
+            //
+            // Defaults to 0 when the metadata field is missing (PIs created
+            // before Item 2 shipped, or non-tip flows like the booking
+            // deposit branch which routes through a different metadata
+            // shape and never reaches here with tip_cents set). The
+            // `Number('') || 0 = 0` shape is forward-compatible by default.
+            //
+            // Subtotal is derived by subtracting tip from the actual
+            // amount received (Stripe's source of truth). `Math.max(0, ...)`
+            // is a defensive floor in case metadata.tip_cents is corrupted
+            // to a value larger than amount_received — we'd rather log $0
+            // subtotal + the full charge as tip than write negative money.
+            const rawTipMeta = pi.metadata?.tip_cents;
+            const parsedTipCents = rawTipMeta != null ? Number(rawTipMeta) : 0;
+            const tipCents = Number.isFinite(parsedTipCents) && parsedTipCents > 0
+              ? Math.floor(parsedTipCents)
+              : 0;
+            const cappedTipCents = Math.min(tipCents, amountReceivedCents);
+            if (cappedTipCents !== tipCents) {
+              console.warn(
+                `[Stripe Webhook] pay_link tip_cents (${tipCents}) > amount_received (${amountReceivedCents}); capping (PI: ${pi.id})`
+              );
+            }
+            const subtotalCents = Math.max(0, amountReceivedCents - cappedTipCents);
+
+            // payment_status compare is against subtotal (the service-portion
+            // remaining), NOT amount_received — tip never reduces what's
+            // outstanding on the appointment. Customer paying $100 service
+            // + $20 tip on a $100 appointment should land payment_status=paid,
+            // not "over-paid".
+            const newPaymentStatus = subtotalCents >= remainingCents ? 'paid' : 'partial';
             const amountReceivedDollars = fromCents(amountReceivedCents);
+            const tipDollars = fromCents(cappedTipCents);
+            const subtotalDollars = fromCents(subtotalCents);
 
             // Mirror booking-deposit transaction shape (book/route.ts:381).
             // Webhook context has no employee actor → employee_id null.
             //
             // Phase 3 Theme A (AC-10 v1.4): receipt_number generated via
             // next_identifier('receipt') (no longer auto-supplied by trigger).
+            //
+            // Item 2: `tip_amount` carries the tip portion; `total_amount`
+            // is still what was charged this txn (subtotal + tip), matching
+            // POS convention at `/api/pos/transactions/route.ts:184-207`.
             const payLinkReceiptNumber = await generateReceiptNumber(admin);
             const { data: tx, error: txErr } = await admin
               .from('transactions')
@@ -169,7 +214,7 @@ export async function POST(request: NextRequest) {
                 status: 'completed',
                 subtotal: Number(appt.total_amount),
                 tax_amount: 0,
-                tip_amount: 0,
+                tip_amount: tipDollars,
                 discount_amount: 0,
                 total_amount: amountReceivedDollars,
                 payment_method: 'card',
@@ -196,16 +241,22 @@ export async function POST(request: NextRequest) {
               `pay_link PI ${pi.id}`
             );
 
-            // Mirror booking-deposit payments shape (book/route.ts:459) +
-            // card_brand/card_last_four when extraction succeeds.
+            // Item 2: payments.amount = subtotal portion (POS convention at
+            // `/api/pos/transactions/route.ts:381-388`); tip_amount carries
+            // tip; tip_net is tip after 5% CC fee deduction for card method.
+            // Historical pay-link rows had tip_amount=0 so amount==subtotal
+            // trivially — no data migration needed, going-forward only.
+            const tipNetDollars = tipDollars > 0
+              ? Math.round(tipDollars * (1 - CC_FEE_RATE) * 100) / 100
+              : 0;
             const { error: payErr } = await admin
               .from('payments')
               .insert({
                 transaction_id: tx.id,
                 method: 'card',
-                amount: amountReceivedDollars,
-                tip_amount: 0,
-                tip_net: 0,
+                amount: subtotalDollars,
+                tip_amount: tipDollars,
+                tip_net: tipNetDollars,
                 stripe_payment_intent_id: pi.id,
                 card_brand: cardDetails.card_brand,
                 card_last_four: cardDetails.card_last_four,
@@ -293,7 +344,7 @@ export async function POST(request: NextRequest) {
             // TODO(payment-link-session-3): send payment_link_paid notification
 
             console.log(
-              `[Stripe Webhook] pay_link_processed (appointment: ${appt.id}, PI: ${pi.id}, amount: $${amountReceivedDollars.toFixed(2)}, status: ${newPaymentStatus}${appt.status === 'pending' ? ', appointment_status: pending→confirmed' : ''})`
+              `[Stripe Webhook] pay_link_processed (appointment: ${appt.id}, PI: ${pi.id}, amount: $${amountReceivedDollars.toFixed(2)}${cappedTipCents > 0 ? ` [subtotal $${subtotalDollars.toFixed(2)} + tip $${tipDollars.toFixed(2)}]` : ''}, status: ${newPaymentStatus}${appt.status === 'pending' ? ', appointment_status: pending→confirmed' : ''})`
             );
           } catch (err) {
             console.error('[Stripe Webhook] pay_link processing failed', {
