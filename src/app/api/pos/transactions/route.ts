@@ -9,6 +9,7 @@ import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { isQboSyncEnabled, getQboSetting } from '@/lib/qbo/settings';
 import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { detectLoyaltyOverspend } from '@/lib/loyalty/redemption-guard';
 import { sendSms } from '@/lib/utils/sms';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { buildTransactionGreeting } from '@/lib/sms/composites';
@@ -468,6 +469,42 @@ export async function POST(request: NextRequest) {
 
       // Handle loyalty redemption first (deduct points)
       if (data.loyalty_points_redeemed > 0) {
+        // Q2 (#NNN) — observational double-spend detection. Redemption is
+        // recorded at booking time but the balance is only debited HERE, so a
+        // customer holding two open redeemed appointments can reach close-out
+        // with a redeemed amount that exceeds the live balance. That case
+        // clamps to 0 silently below; record it to audit_log FIRST so the
+        // otherwise-invisible over-redemption is queryable. OBSERVATIONAL only
+        // — we still proceed with the existing clamp (no enforcement here; the
+        // structural fix is Option A Phase 3). Inline insert mirrors the
+        // 'auto_receipt_skipped' system-event precedent in this file (action is
+        // outside the curated AuditAction union; audit_log.action has no DB
+        // enum/CHECK). See JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md Q2.
+        const overspend = detectLoyaltyOverspend(
+          data.loyalty_points_redeemed,
+          currentBalance
+        );
+        if (overspend) {
+          try {
+            await supabase.from('audit_log').insert({
+              action: 'loyalty_overspend_detected',
+              entity_type: 'transaction',
+              entity_id: transaction.id,
+              source: 'system',
+              details: {
+                customer_id: data.customer_id,
+                appointment_id: transaction.appointment_id,
+                requested_points: overspend.requestedPoints,
+                available_balance: overspend.availableBalance,
+                overspend_delta: overspend.overspendDelta,
+                detected_at: new Date().toISOString(),
+              },
+            });
+          } catch (auditErr) {
+            console.error('[Loyalty] overspend audit_log insert failed:', auditErr);
+          }
+        }
+
         currentBalance = Math.max(0, currentBalance - data.loyalty_points_redeemed);
 
         await supabase.from('loyalty_ledger').insert({

@@ -43,6 +43,10 @@ import { formatCurrency } from '@/lib/utils/format';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { buildPaymentInfo, buildDepositInfo } from '@/lib/sms/composites';
 import { applyCombosToQuoteItems } from '@/lib/services/combo-resolver';
+import {
+  resolveBookingLoyaltyRedemption,
+  insufficientLoyaltyErrorMessage,
+} from '@/lib/loyalty/redemption-guard';
 
 export async function POST(request: NextRequest) {
   try {
@@ -559,9 +563,52 @@ export async function POST(request: NextRequest) {
 
     // Calculate total with all discounts
     const couponDiscount = data.coupon_discount ?? 0;
-    const loyaltyDiscount = data.loyalty_discount ?? 0;
+
+    // Q2 (#NNN) — server-side loyalty affordability check + canonical discount
+    // recompute. Booking does NOT debit customers.loyalty_points_balance (the
+    // structural debit-at-booking fix is deferred to Option A Phase 3, which
+    // MUST close the concurrency window — see
+    // docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md Q2 follow-up). Here
+    // we (a) reject a redemption that exceeds the LIVE balance instead of
+    // letting it clamp silently at close-out, and (b) recompute loyalty_discount
+    // from points via the Phase 1 helper, never trusting the client-submitted
+    // value. This closes the tampering + gross-overspend holes; the residual
+    // race (two bookings before either closes out) is the documented deferral.
+    const requestedLoyaltyPoints = Number(data.loyalty_points_used ?? 0) || 0;
+    let loyaltyPoints = 0;
+    let loyaltyDiscount = 0;
+    if (requestedLoyaltyPoints > 0) {
+      const { data: loyaltyCustomer, error: loyaltyBalanceErr } = await supabase
+        .from('customers')
+        .select('loyalty_points_balance')
+        .eq('id', customerId)
+        .single();
+      if (loyaltyBalanceErr || !loyaltyCustomer) {
+        return NextResponse.json(
+          { error: 'Unable to verify loyalty balance. Please try again.' },
+          { status: 500 }
+        );
+      }
+      const resolved = resolveBookingLoyaltyRedemption(
+        requestedLoyaltyPoints,
+        loyaltyCustomer.loyalty_points_balance ?? 0
+      );
+      if (!resolved.ok) {
+        return NextResponse.json(
+          {
+            error: insufficientLoyaltyErrorMessage(
+              resolved.requestedPoints,
+              resolved.availableBalance
+            ),
+          },
+          { status: 422 }
+        );
+      }
+      loyaltyPoints = resolved.loyaltyPoints;
+      loyaltyDiscount = resolved.loyaltyDiscount;
+    }
+
     const totalAfterDiscount = subtotal - couponDiscount - loyaltyDiscount;
-    const loyaltyPoints = Number(data.loyalty_points_used ?? 0) || 0;
 
     // Phase 3 Theme A (AC-10 v1.4): appointment_number is NOT NULL — generate
     // it before the INSERT so the row can satisfy the constraint.

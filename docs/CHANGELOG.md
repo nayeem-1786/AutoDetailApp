@@ -6,6 +6,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(loyalty): Q2 — hardened defer of double-spend resolution (server affordability check + overspend detection) (2026-06-22, Session #162)
+
+Closes the audit gap **Q2** from `docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md`. Loyalty redemption is recorded on the appointment at booking time (`appointments.loyalty_points_redeemed` + `loyalty_discount`) but the spendable balance (`customers.loyalty_points_balance`) is debited only at POS close-out via an unlocked read-modify-write. Between booking and close-out a customer can hold two appointments each redeeming the **same** balance — the *double-spend window*. At the second close-out the existing `Math.max(0, balance − redeemed)` clamps to 0 **silently** (no error, close-out succeeds), so the over-redemption was previously invisible.
+
+### Operator decision — path lock (B+)
+
+Audit-first session. Confirmed the bug against primary source, quantified the risk (medium: accidental, recurring, but bounded small-dollar; manually detectable/correctable), and surfaced **Path A** (full structural fix: debit-at-booking + close-out idempotency + cancel-restore across 5 surfaces) vs **Path B** (pure defer to Option A Phase 3). Operator locked **B+ — hardened defer**: do NOT relocate the debit (that is Phase 3's architectural job), but harden the two in-scope surfaces and make the deferred window observable. Chosen over full Path A because Path A's irreducible package touches the shared `cancel-orchestration.ts` during 3 parallel sessions and would be largely reworked by the active Option A Phase 3 (Phase 1 merged in Session #158).
+
+### Added
+
+- **`src/lib/loyalty/redemption-guard.ts`** (NEW) — two pure helpers. `resolveBookingLoyaltyRedemption(requestedPoints, availableBalance)` validates affordability against the **live** balance and recomputes the discount canonically from points via the Phase 1 helper `pointsToCents` (the client-submitted `loyalty_discount` is never trusted — anti-tamper); returns a `{ ok: true; loyaltyPoints; loyaltyDiscount } | { ok: false; requestedPoints; availableBalance }` discriminated union plus `insufficientLoyaltyErrorMessage()`. `detectLoyaltyOverspend(requestedPoints, availableBalance)` returns an overspend descriptor (the double-spend signature) or `null` — pure, observational. **This is the first consumer of the Phase 1 `pointsToCents` helper — a small but real Phase 2 migration moment.**
+
+### Changed
+
+- **`src/app/api/book/route.ts`** — booking now reads `customers.loyalty_points_balance` (only when `loyalty_points_used > 0`), rejects an unaffordable redemption with **422** (`Insufficient loyalty balance — requested X points, have Y available`) instead of letting it clamp silently at close-out, and persists the **server-recomputed** `loyalty_discount` (NO inline math — routed through `pointsToCents`). For an untampered client the recomputed value equals the prior client value, so legitimate bookings are unchanged; a tampered discount is overridden. **Booking still does NOT debit the balance** — that is the documented Phase 3 deferral.
+- **`src/app/api/pos/transactions/route.ts`** — before the existing close-out debit clamp, when `loyalty_points_redeemed > currentBalance` the route writes a `loyalty_overspend_detected` `audit_log` row (`details`: `customer_id`, `appointment_id`, `requested_points`, `available_balance`, `overspend_delta`, `detected_at`) and **proceeds** with the unchanged clamp. **Observational, not enforcement** — close-out is never blocked. Inline `audit_log` insert mirrors the existing `auto_receipt_skipped` system-event precedent in this file (action sits outside the curated `AuditAction` union; `audit_log.action` has no DB enum/CHECK). Operators can now query `audit_log` for these events to detect incidents.
+
+### Risk acceptance — residual concurrency window (deferred to Phase 3)
+
+The **concurrency race itself is not closed** by this session: two bookings made before either closes out both read the same un-debited balance and both pass the affordability check. That residual window is the **accepted Q2 deferral**. B+ removes the two cheap, non-throwaway holes (server-side tampering + gross over-redemption beyond any balance ever held) and converts the previously-silent over-redemption into a queryable `audit_log` event. **Phase 3 (open-transaction lifecycle) MUST close the concurrency window** — flagged as a hard must-close requirement in `JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md` §Q2. Financial exposure in the interim is bounded by point balance × redeem rate (typically small-dollar); reconciliation is manual via `loyalty_ledger`, correction via Admin → Customers → Loyalty → Manual Adjust (`customers.adjust_loyalty`).
+
+### What shipped
+
+- **`src/lib/loyalty/redemption-guard.ts` NEW** — pure affordability + recompute + overspend-detection helpers.
+- **`src/app/api/book/route.ts` MOD** — affordability gate (422) + canonical discount recompute; new import from `redemption-guard`. NO debit.
+- **`src/app/api/pos/transactions/route.ts` MOD** — observational `loyalty_overspend_detected` audit_log; new import from `redemption-guard`. Clamp unchanged.
+- **`src/lib/loyalty/__tests__/redemption-guard.test.ts` NEW** — 13 pure-logic cases (affordability boundaries, anti-tamper recompute anchored to `LOYALTY.REDEEM_RATE_CENTS`, overspend detection both directions + balance-drained-to-0 double-spend).
+- **`src/app/api/book/__tests__/loyalty-affordability.test.ts` NEW** — 4 route-level cases (within-balance 201 + recomputed discount persisted; over-balance 422 + no appointment written; tampered discount overridden; zero-points no-op).
+- **`src/app/api/pos/transactions/__tests__/loyalty-overspend-detection.test.ts` NEW** — 4 route-level cases (overspend → audit_log written + close-out succeeds; within-balance → no row; exact-boundary → no row; balance-drained-to-0 → full-delta row).
+
+### Gates
+
+- `tsc --noEmit`: 3 pre-existing baseline errors preserved (all in `customer-accept-service.test.ts`), 0 new.
+- ESLint (changed files): 0 findings.
+- Vitest: 53 passed across the 3 new + 3 adjacent regression files (21 new tests).
+- `npm run build`: clean (exit 0).
+
+### Out of scope (do NOT "fix" later without re-deciding)
+
+- **No debit at booking** — deferred to Option A Phase 3 (the architectural fix).
+- **No cancellation-flow changes** — `cancel-orchestration.ts` and all cancel routes untouched (Path A territory; parallel-session safety).
+- **No schema changes** — reuses `customers.loyalty_points_balance` + `audit_log`.
+- **No blocking on overspend** — the close-out detection is observational; the `Math.max(0, …)` clamp is unchanged.
 ## fix(send-link): Issue 1 — dual-channel fallback when one contact channel missing (2026-06-22, Session #161)
 
 When an operator clicked **Send Payment Link** from the POS Jobs view with **"Both Email & SMS"** selected, a customer who had only one channel on file (email but no phone, or phone but no email) got a **silent total failure** — a red toast (*"Customer has no phone number on file"*) and **nothing sent on either channel**, even though the available channel could have succeeded. Fixed so a `both` send degrades to the channel on file and surfaces a warning about the missing one; only a customer with **neither** channel hard-fails.

@@ -421,6 +421,16 @@ Visa ****1074    $369.75
 
 **To investigate in Phase 0 of implementation, not in this audit.**
 
+#### Q2 follow-up — hardened defer shipped (Session #162, 2026-06-22)
+
+Audit-first session re-confirmed the window against primary source and surfaced the Path-A-vs-defer decision. Operator locked **B+ — hardened defer** (NOT the tactical debit-at-booking; NOT pure no-op defer). What shipped:
+
+- **Booking (`api/book/route.ts`)** — server-side affordability check against the **live** balance: an unaffordable redemption is now **rejected with 422** instead of clamping silently at close-out; `loyalty_discount` is **recomputed canonically** from points via the Phase 1 `pointsToCents` helper (closes the trust asymmetry called out in Section 0 row 8 — the server no longer trusts the client-submitted `loyalty_discount`). **Booking still does NOT debit `customers.loyalty_points_balance`.**
+- **Close-out (`api/pos/transactions/route.ts`)** — when `loyalty_points_redeemed > currentBalance` (the double-spend signature) the route writes a `loyalty_overspend_detected` `audit_log` row **and proceeds** (the `Math.max(0, …)` clamp is unchanged). Observational only — the previously-silent over-redemption is now queryable.
+- **New pure helper** — `src/lib/loyalty/redemption-guard.ts` (`resolveBookingLoyaltyRedemption`, `detectLoyaltyOverspend`, `insufficientLoyaltyErrorMessage`).
+
+> **⚠️ PHASE 3 MUST-CLOSE (non-optional).** B+ deliberately leaves the **concurrency race itself open**: two bookings made before either closes out both read the same un-debited balance and both pass the affordability check. **Phase 3 (open-transaction lifecycle) MUST close this window** — under the single-open-transaction model, redemption writes the `loyalty_ledger` entry and debits the balance atomically at the moment it is committed to the open transaction, eliminating the booking→close-out gap. This is a **hard requirement of Phase 3, not a nice-to-have** — Phase 3 work that does not debit/reserve loyalty at redemption-commit time has NOT closed Q2. The `loyalty_overspend_detected` audit_log events are the interim detection signal; they should drop to zero once Phase 3 ships. When Phase 3 lands, remove the booking-side affordability check + close-out detection only if the open-transaction lifecycle subsumes them (the affordability check + canonical recompute are correct regardless and may stay).
+
 ---
 
 ## Revised 3-Phase Implementation Plan
