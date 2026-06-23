@@ -6,6 +6,40 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(payment-link-receipt): Q4 — webhook writes transaction_items (Path A) (2026-06-22, Session #163)
+
+**Sparse payment-link receipts now render line items.** The Stripe webhook's `appointment_payment_link` branch created a `transactions` row + `payments` row but never inserted any `transaction_items`, so a customer opening their pay-link receipt (e.g. SD-06444) saw `Subtotal → Tax → TOTAL` over an **empty items block** — they knew what they paid, not what they paid for. Q4 follow-up to `docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md` (Q4, classified S0 — Receipt UX).
+
+### Audit gate — Path A vs Path B (operator-locked)
+
+A read-only audit (4 parallel readers across the webhook, `receipt-template.ts`, `receipt-data.ts`/`receipt-composer.ts`, and every receipt-render surface) compared **Path A** (webhook writes `transaction_items` at write time) vs **Path B** (receipt-template graceful degradation — render-only "Payment for: [services]"). The census **inverted the prompt's scope assumption**: Path B is *not* a 1-file change — the public SMS-link page `(public)/receipt/[token]/page.tsx` renders items via its own bespoke `tx.items.map()`, separate from the shared `pos/lib/receipt-template.ts`, so Path B needs ≥2 render files; whereas **Path A is one branch in one file** that fixes all 7 surfaces by populating `tx.items` at the source and is forward-compatible with Option A Phase 3. **Operator locked Path A.**
+
+### Added
+
+- **`transaction_items` insert on the pay-link webhook branch** (`src/app/api/webhooks/stripe/route.ts`). Sourced from `appointment_services` (the canonical primary+addon list) joined to `services` for `name` / `is_taxable` / `classification`, plus the appointment's mobile fields for a `mobile_fee` line. Mirrors the booking-deposit item-write pattern (`book/route.ts:744-819`) **exactly**: rows at full `appointment_services.price_at_booking` prices, `tax_amount: 0` (no tax collected at payment time — POS finalization computes tax at close-out via a live `services.is_taxable` lookup). The `mobile_fee` line stays `is_taxable: false` (CDTFA Pub 100 — separately-stated delivery fee).
+- Appointment SELECT widened to fetch `is_mobile, mobile_surcharge, mobile_zone_name_snapshot`.
+
+### Implementation choices (operator-approved)
+
+- **`is_addon`** derived from `services.classification` (`addon_only → true`) — `appointment_services` carries no primary/addon flag; audit-only metadata, not rendered by the receipt template.
+- **`pricing_type='standard'` + `standard_price=unit_price`** — `appointment_services` doesn't preserve combo metadata and re-running combo detection at webhook time is non-deterministic (seasonal windows drift). The price itself is already correct (combo price is baked into `price_at_booking`).
+- **Non-fatal + placed AFTER the payments-row commit** — the per-PI idempotency guard (`route.ts:97-121`) keys on the `payments` row, so the items insert is covered by it (a Stripe re-fire short-circuits before reaching the insert; items written exactly once). On failure the block logs and continues (never throws): a fatal throw would 500 → Stripe retry → the guard short-circuits → items could never be written, yet the payment is already recorded. Worst case on failure is the pre-Q4 empty-items receipt — no regression, no lost/duplicate payment.
+
+### Known limitation (pre-existing, not introduced by Q4)
+
+When an appointment carries a discount (manual/coupon/loyalty), the payment-link receipt's items will sum to a higher value than the subtotal. This is the same data shape the booking-deposit transaction has today — items at full service prices with subtotal carrying the net (post-discount) value (`SUM(items) = appt.subtotal` pre-discount; `transactions.subtotal = appt.total_amount` net; they diverge by exactly `appt.discount_amount`). Discount fidelity across all transaction types is deferred to **Option A Phase 3** (single-transaction lifecycle), which will write discount-line breakdowns alongside items consistently. **Item 2's subtotal/discount writes on this branch are intentionally untouched** (`subtotal` stays `appt.total_amount`; `discount_amount` stays 0).
+
+> **Phase 3 must close:** Option A Phase 3 (single-transaction lifecycle) MUST address the discount-fidelity gap surfaced during Q4 implementation — items at full prices with post-discount subtotal applies to deposit + payment-link + close-out transactions consistently today; Phase 3 must make all three write discount breakdowns alongside items.
+
+### Tests
+
+New `src/app/api/webhooks/stripe/__tests__/payment-link-items.test.ts` (6 cases, mirrors `payment-link-tip.test.ts`'s self-contained webhook mock harness): (1) service line written from `appointment_services` with correct shape; (2) non-taxable `mobile_fee` line when `appt.is_mobile`; (3) multi-service appointment writes all lines with `is_addon` derived from classification; (4) empty `appointment_services` → `console.warn` + transaction/payment still commit; (5) `transaction_items` insert failure → `console.error`, NO throw, payment + appointment update still succeed (idempotency / non-fatal guard); (6) discount case → items at FULL `price_at_booking` while `transactions.subtotal` stays the net `appt.total_amount` (locks the known gap).
+
+### Scope / gates
+
+- **Files:** 1 prod MOD (`webhooks/stripe/route.ts`, +147/−1) + 1 NEW test file + 3 doc MOD (this CHANGELOG + ROADMAP-13-ITEMS + FILE_TREE). NO schema changes. NO touching files outside the pay-link branch scope (Tracks 1/2/4 boundaries respected). Item 2's `route.ts:215` subtotal write + `discount_amount: 0` untouched.
+- **Memory #8:** +147 net webhook lines (incl. a ~21-line idempotency/known-gap rationale comment; the bulk is the deposit-mirrored 18-field item literals × 2 + two indexed reads) — under the ~150 ceiling.
+- **Gates:** tsc 3 baseline preserved (`customer-accept-service.test.ts:44,49,73` TS2556 unchanged, unrelated); lint 0 new; vitest **3575/3575 pass** (webhook suite 48 pass incl. 6 new); build clean (exit 0).
 ## fix(loyalty): Q2 — hardened defer of double-spend resolution (server affordability check + overspend detection) (2026-06-22, Session #162)
 
 Closes the audit gap **Q2** from `docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md`. Loyalty redemption is recorded on the appointment at booking time (`appointments.loyalty_points_redeemed` + `loyalty_discount`) but the spendable balance (`customers.loyalty_points_balance`) is debited only at POS close-out via an unlocked read-modify-write. Between booking and close-out a customer can hold two appointments each redeeming the **same** balance — the *double-spend window*. At the second close-out the existing `Math.max(0, balance − redeemed)` clamps to 0 **silently** (no error, close-out succeeds), so the over-redemption was previously invisible.

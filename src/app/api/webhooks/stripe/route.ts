@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
             // (audit + `appointment_confirmed` outbound webhook).
             const { data: appt, error: apptErr } = await admin
               .from('appointments')
-              .select('id, customer_id, vehicle_id, total_amount, payment_status, payment_link_paid_at, stripe_payment_intent_id, status')
+              .select('id, customer_id, vehicle_id, total_amount, payment_status, payment_link_paid_at, stripe_payment_intent_id, status, is_mobile, mobile_surcharge, mobile_zone_name_snapshot')
               .eq('id', apptIdFromMeta)
               .maybeSingle();
 
@@ -264,6 +264,152 @@ export async function POST(request: NextRequest) {
 
             if (payErr) {
               throw new Error(`payment insert failed: ${payErr.message}`);
+            }
+
+            // Q4 (Session #163) — write transaction_items for the pay-link
+            // transaction so receipts render what the customer paid for. Pre-Q4
+            // this branch wrote transactions + payments but NO line items, so
+            // pay-link receipts showed totals over an empty items block (the
+            // SD-06444 case). Full Path-A rationale + the known discount gap are
+            // in the CHANGELOG + JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md (Q4).
+            //
+            // Mirrors the booking-deposit pattern (book/route.ts:744-819)
+            // EXACTLY: items at full `appointment_services.price_at_booking`;
+            // `tax_amount: 0` (tax is collected at POS close-out, not at payment
+            // time). KNOWN GAP (pre-existing): on a discounted appointment
+            // SUM(items) = appt.subtotal (pre-discount) while this row's subtotal
+            // = appt.total_amount (net) — identical to the deposit row today;
+            // Option A Phase 3 owns discount fidelity. Item 2's subtotal /
+            // discount_amount writes above stay untouched.
+            //
+            // NON-FATAL + placed AFTER the payments-row commit: the per-PI guard
+            // (:97-121) keys on the payments row, so a Stripe re-fire short-
+            // circuits before here (items written exactly once). A failure logs
+            // and continues — a throw would 500 → retry → guard short-circuits →
+            // items never written while the payment is already recorded. Worst
+            // case = the pre-Q4 empty-items receipt (no regression).
+            try {
+              const { data: apptServiceRows, error: apptSvcErr } = await admin
+                .from('appointment_services')
+                .select('service_id, price_at_booking, tier_name')
+                .eq('appointment_id', appt.id);
+              if (apptSvcErr) {
+                throw new Error(
+                  `appointment_services lookup failed: ${apptSvcErr.message}`
+                );
+              }
+
+              const serviceRows = apptServiceRows ?? [];
+              if (serviceRows.length === 0) {
+                // Data anomaly: appointment with no service rows. The
+                // transaction + payment already committed and stay valid; the
+                // receipt degrades to the pre-Q4 totals-only shape.
+                console.warn(
+                  `[Stripe Webhook] pay_link no appointment_services rows for items (appointment: ${appt.id}, tx: ${tx.id}); transaction committed without line items`
+                );
+              } else {
+                const serviceIds = Array.from(
+                  new Set(serviceRows.map((r) => r.service_id))
+                );
+                const { data: svcMeta, error: svcMetaErr } = await admin
+                  .from('services')
+                  .select('id, name, is_taxable, classification')
+                  .in('id', serviceIds);
+                if (svcMetaErr) {
+                  throw new Error(`services lookup failed: ${svcMetaErr.message}`);
+                }
+                const svcById = new Map(
+                  (svcMeta ?? []).map((s) => [s.id, s])
+                );
+
+                const serviceLineItems = serviceRows.map((row) => {
+                  const svc = svcById.get(row.service_id);
+                  const price = Number(row.price_at_booking);
+                  return {
+                    transaction_id: tx.id,
+                    item_type: 'service' as const,
+                    product_id: null,
+                    service_id: row.service_id,
+                    package_id: null,
+                    item_name: svc?.name ?? 'Service',
+                    quantity: 1,
+                    unit_price: price,
+                    total_price: price,
+                    tax_amount: 0,
+                    is_taxable: svc?.is_taxable ?? false,
+                    tier_name: row.tier_name ?? null,
+                    vehicle_size_class: null,
+                    notes: null,
+                    standard_price: price,
+                    pricing_type: 'standard' as const,
+                    // appointment_services carries no primary/addon flag —
+                    // derive from the service's classification. Audit-only
+                    // metadata; the receipt template does not render it.
+                    is_addon: svc?.classification === 'addon_only',
+                    prerequisite_note: null,
+                  };
+                });
+
+                // Mobile-fee line — non-taxable per CDTFA Pub 100
+                // (separately-stated delivery fee), mirroring
+                // book/route.ts:793-814. Driven off the appointment row's
+                // mobile fields (added to the SELECT above).
+                const mobileSurchargeNum = Number(appt.mobile_surcharge ?? 0);
+                const mobileLineItems =
+                  appt.is_mobile && mobileSurchargeNum > 0
+                    ? [
+                        {
+                          transaction_id: tx.id,
+                          item_type: 'mobile_fee' as const,
+                          product_id: null,
+                          service_id: null,
+                          package_id: null,
+                          item_name:
+                            appt.mobile_zone_name_snapshot || 'Mobile Service Fee',
+                          quantity: 1,
+                          unit_price: mobileSurchargeNum,
+                          total_price: mobileSurchargeNum,
+                          tax_amount: 0,
+                          is_taxable: false,
+                          tier_name: null,
+                          vehicle_size_class: null,
+                          notes: null,
+                          standard_price: mobileSurchargeNum,
+                          pricing_type: 'standard' as const,
+                          is_addon: false,
+                          prerequisite_note: null,
+                        },
+                      ]
+                    : [];
+
+                const lineItems = [...serviceLineItems, ...mobileLineItems];
+                const { error: itemsErr } = await admin
+                  .from('transaction_items')
+                  .insert(lineItems);
+                if (itemsErr) {
+                  throw new Error(
+                    `transaction_items insert failed: ${itemsErr.message}`
+                  );
+                }
+                console.log(
+                  `[Stripe Webhook] pay_link items_written (appointment: ${appt.id}, tx: ${tx.id}, lines: ${lineItems.length})`
+                );
+              }
+            } catch (itemsError) {
+              // Non-fatal — payment is already recorded; never block on item
+              // persistence (see IDEMPOTENCY note above).
+              console.error(
+                '[Stripe Webhook] pay_link transaction_items write failed (non-fatal)',
+                {
+                  payment_intent_id: pi.id,
+                  appointment_id: appt.id,
+                  transaction_id: tx.id,
+                  error:
+                    itemsError instanceof Error
+                      ? itemsError.message
+                      : String(itemsError),
+                }
+              );
             }
 
             // Update appointment. Only write stripe_payment_intent_id if currently NULL
