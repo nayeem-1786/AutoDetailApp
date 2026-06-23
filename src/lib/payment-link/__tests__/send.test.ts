@@ -739,6 +739,104 @@ describe('sendPaymentLink — partial failures', () => {
   });
 });
 
+// =============================================================================
+// Issue 1 — method='both' dual-channel fallback (single-channel customers)
+// =============================================================================
+//
+// Before this fix, the pre-flight gate (send.ts) hard-failed the ENTIRE send
+// with HTTP 422 when method='both' and the customer was missing ONE channel —
+// sending nothing even though the available channel could have succeeded. The
+// fix relaxes ONLY the `both` disjunct: a `both` send now degrades to the
+// channel(s) on file and surfaces the absent channel as channels.<x>='skipped'
+// + a partial_errors[] warning. NEITHER-channel still 422s (nothing to send to),
+// and single-channel methods are unchanged (the two 422 tests above are the
+// regression guards proving the relaxation didn't over-reach).
+describe('sendPaymentLink — method=both dual-channel fallback (Issue 1)', () => {
+  // email present, phone missing → email sent, SMS skipped, success + warning.
+  // sendSms MUST NOT be called (no destination to attempt).
+  it('falls back to email when method=both and customer has no phone', async () => {
+    state.appointment!.customer!.phone = null; // email-only customer
+    const result = await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'both',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.channels.email).toBe('sent');
+      expect(result.channels.sms).toBe('skipped');
+      expect(result.partial_errors).toBeDefined();
+      expect(
+        result.partial_errors!.some((e) => e.includes('phone number')),
+      ).toBe(true);
+    }
+    expect(sendTemplatedEmailMock).toHaveBeenCalledOnce();
+    expect(sendSmsMock).not.toHaveBeenCalled();
+  });
+
+  // phone present, email missing → SMS sent, email skipped, success + warning.
+  // sendTemplatedEmail MUST NOT be called (no destination to attempt).
+  it('falls back to SMS when method=both and customer has no email', async () => {
+    state.appointment!.customer!.email = null; // phone-only customer
+    const result = await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'both',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.channels.sms).toBe('sent');
+      expect(result.channels.email).toBe('skipped');
+      expect(result.partial_errors).toBeDefined();
+      expect(
+        result.partial_errors!.some((e) => e.includes('email address')),
+      ).toBe(true);
+    }
+    expect(sendSmsMock).toHaveBeenCalledOnce();
+    expect(sendTemplatedEmailMock).not.toHaveBeenCalled();
+  });
+
+  // both channels present → both sent, NO partial_errors (regression guard that
+  // the fallback did not introduce spurious warnings on the all-clear path).
+  it('sends both channels with no partial_errors when method=both and both present', async () => {
+    const result = await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'both',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.channels.sms).toBe('sent');
+      expect(result.channels.email).toBe('sent');
+      expect(result.partial_errors).toBeUndefined();
+    }
+    expect(sendSmsMock).toHaveBeenCalledOnce();
+    expect(sendTemplatedEmailMock).toHaveBeenCalledOnce();
+  });
+
+  // neither channel on file → 422, no send attempted on either channel, and the
+  // post-send stamp must NOT have run (return-before-mutation preserved).
+  it('returns 422 with no send attempted when method=both and customer has neither email nor phone', async () => {
+    state.appointment!.customer!.email = null;
+    state.appointment!.customer!.phone = null;
+    const result = await send({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'both',
+    });
+    expect(result.success).toBe(false);
+    if (result.success === false) {
+      expect(result.status).toBe(422);
+    }
+    expect(sendSmsMock).not.toHaveBeenCalled();
+    expect(sendTemplatedEmailMock).not.toHaveBeenCalled();
+    const stamp = captured.updates.find(
+      (u) => u.payload.payment_link_sent_at !== undefined,
+    );
+    expect(stamp).toBeUndefined();
+  });
+});
+
 describe('sendPaymentLink — SMS body composition', () => {
   it('passes the canonical chip set { first_name, amount_due, pay_url } to renderSmsTemplate', async () => {
     await send({
