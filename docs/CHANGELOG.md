@@ -6,6 +6,46 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(send-link): Issue 1 — dual-channel fallback when one contact channel missing (2026-06-22, Session #161)
+
+When an operator clicked **Send Payment Link** from the POS Jobs view with **"Both Email & SMS"** selected, a customer who had only one channel on file (email but no phone, or phone but no email) got a **silent total failure** — a red toast (*"Customer has no phone number on file"*) and **nothing sent on either channel**, even though the available channel could have succeeded. Fixed so a `both` send degrades to the channel on file and surfaces a warning about the missing one; only a customer with **neither** channel hard-fails.
+
+### Root cause — `src/lib/payment-link/send.ts` pre-flight gate
+
+The shared `sendPaymentLink` helper's pre-flight channel-availability gate hard-failed the *entire* send with HTTP 422 whenever a requested channel lacked a destination:
+
+```ts
+if ((method === 'email' || method === 'both') && !customer.email) return { ...422, error: 'Customer has no email address on file' };
+if ((method === 'sms'   || method === 'both') && !customer.phone) return { ...422, error: 'Customer has no phone number on file' };
+```
+
+The `|| method === 'both'` disjunct meant a `both` request aborted entirely when only one channel was missing. This contradicted every other dual-channel sender in the codebase (`src/lib/email/send-cancellation-email.ts`, `src/lib/quotes/send-service.ts`, the appointment-notify routes), all of which skip-and-continue. The helper's actual dispatch section was **already** best-effort (independent `if (shouldEmail && customer.email)` / `if (shouldSms && customer.phone)` blocks, success requires only `sentCount > 0`) — the buggy gate was the sole obstacle.
+
+### Fixed
+
+- **Gate relaxed for `method='both'`** — single-channel `email`/`sms` requests to a missing destination still hard-fail 422 (correct — nothing to deliver). `both` now only hard-fails 422 when **neither** channel exists (`Customer has no email address or phone number on file`); when exactly one is missing it falls through to dispatch.
+- **Skip-reporting in dispatch** — the email and SMS dispatch blocks gained explicit `else` branches (reachable only on `both`): the absent channel is marked `channels.<x> = 'skipped'` and a human-readable reason is pushed to `partial_errors[]` (`Customer has no phone number on file — payment link not sent via SMS`, and the email symmetric). Reuses the existing `'skipped'` status already in `PaymentLinkChannelStatus`.
+- **Operator UX (no frontend change)** — `src/components/jobs/send-payment-link-dialog.tsx` already reads `channels` + `partial_errors`: it renders a green success toast (*"Payment link sent via email"*) for what went out plus one `toast.warning` per skipped channel. The helper fix alone makes the operator see exactly that. The voice-agent path (`/api/voice-agent/send-payment-link`) uses the same helper and already forwards `channels` + `partial_errors`, so it's fixed in lockstep.
+- **All-channels-attempted-and-failed unchanged** — the existing `sentCount === 0 → 500 'All channels failed'` path (infra failure after attempting) is preserved as-is. The new pre-dispatch 422 covers the distinct *nothing-to-send-to* case. Keeping them separate preserved the existing test and minimized scope.
+
+### What shipped
+
+- **`src/lib/payment-link/send.ts` MOD** — pre-flight gate split into three checks (single-channel email, single-channel sms, both-needs-at-least-one); two skip-reporting `else` branches added to the dispatch section. ~25 net prod lines.
+- **`src/lib/payment-link/__tests__/send.test.ts` MOD** — new `describe('… method=both dual-channel fallback (Issue 1)')` block, +4 cases: email-only+`both` → email sent + SMS `'skipped'` + phone warning, no `sendSms`; phone-only+`both` → SMS sent + email `'skipped'` + email warning, no `sendTemplatedEmail`; both present → both sent + no `partial_errors` (regression guard); neither → 422, no send attempted, no post-send stamp. The two existing single-channel 422 tests are unchanged and now double as regression guards proving the relaxation didn't over-reach.
+- **`docs/CHANGELOG.md`** — this entry.
+- **`docs/dev/ROADMAP-13-ITEMS.md`** — new bottom-ledger row (Session #161 placeholder).
+
+### Out of scope (flagged, not touched)
+
+`src/lib/sms-ai/tools.ts` (voice-agent tool description) says *"if the customer has no email…server returns 422"* — now slightly stale for the `both` case. Not in this session's scope, and the behavior change is strictly better for the agent (success + `partial_errors` instead of a 422). Left for a future doc-only pass.
+
+### Gates
+
+tsc: 3 baseline preserved (`customer-accept-service.test.ts:44,49,73` TS2556, unrelated — diff vs baseline identical). lint: 0 new (the lone `send.ts` `remaining_cents_at_send` warning is pre-existing — confirmed at line 625 on HEAD, in the untouched audit block). vitest: `send.test.ts` **38/38** (was 34; +4 new). build: clean.
+
+### Hard rules respected
+
+Helper-only fix (no frontend, no routes — both already consume the shape correctly). NO schema changes. NO migrations. NO new dependencies. NO unifying the all-failed 500 → 422 (separate audit if wanted later). NO touching files outside scope (parallel Track 2/3/4 worktree boundaries respected). Under Memory #8's line target.
 ## fix(pos-edit-mode): Q3 — surface coupon revalidation failures to operator (2026-06-22, Session #160)
 
 Q3 follow-up from `docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md`. **UX-visibility fix:** the POS edit-mode deep-link drain (`/pos?source=appointment&id=…`) re-validates a saved coupon against `/api/pos/coupons/validate` on load. When the coupon no longer applies (expired / single-use consumed / customer no longer qualifies / yields $0 against the current cart) the drain dropped it **silently** — the operator saw no warning and the customer lost their discount entitlement with no trace. The drop is now surfaced as an operator toast. The underlying drop LOGIC is unchanged (an invalid coupon is still not applied); this is additive visibility so the operator can re-apply a different coupon, discount manually, or proceed knowingly.

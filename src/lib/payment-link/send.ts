@@ -292,21 +292,40 @@ export async function sendPaymentLink(
     };
   }
 
-  // Strict 422 when a requested channel has no destination on file. Operator
-  // UI is expected to gate the send button; voice-agent dispatcher cannot
-  // gate this preemptively, so this is a real error path on the agent path.
-  if ((method === 'email' || method === 'both') && !customer.email) {
+  // Channel-availability gate (Issue 1 — dual-channel fallback).
+  //
+  // A SINGLE-channel request to a missing destination has nothing to deliver,
+  // so it still hard-fails 422 (operator UI gates the button; the voice-agent
+  // dispatcher cannot, so this remains a real error path there).
+  //
+  // For `method='both'`, best-effort applies — mirrors every other
+  // dual-channel sender in the codebase (`src/lib/email/send-cancellation-email.ts`,
+  // `src/lib/quotes/send-service.ts`, the appointment-notify routes): when ONE
+  // channel is missing we DO NOT abort the whole send. Instead we fall through
+  // to the dispatch section below, which delivers via the available channel and
+  // marks the absent one `channels.<x>='skipped'` + a `partial_errors[]` warning
+  // (the operator dialog surfaces that as a success toast for what went out plus
+  // a warning toast for what didn't). We only hard-fail `both` here when NEITHER
+  // channel has a destination — there is genuinely nothing to send to.
+  if (method === 'email' && !customer.email) {
     return {
       success: false,
       status: 422,
       error: 'Customer has no email address on file',
     };
   }
-  if ((method === 'sms' || method === 'both') && !customer.phone) {
+  if (method === 'sms' && !customer.phone) {
     return {
       success: false,
       status: 422,
       error: 'Customer has no phone number on file',
+    };
+  }
+  if (method === 'both' && !customer.email && !customer.phone) {
+    return {
+      success: false,
+      status: 422,
+      error: 'Customer has no email address or phone number on file',
     };
   }
 
@@ -491,6 +510,15 @@ export async function sendPaymentLink(
       channels.email = 'failed';
       errors.push(err instanceof Error ? err.message : 'Email send threw');
     }
+  } else if (shouldEmail && !customer.email) {
+    // Issue 1 — only reachable on method='both' (a single-channel 'email'
+    // request to a missing address is hard-failed at the gate above). The
+    // customer has no email, so we skip the channel and surface a warning
+    // rather than silently dropping it; the SMS channel still dispatches.
+    channels.email = 'skipped';
+    errors.push(
+      'Customer has no email address on file — payment link not sent via email'
+    );
   }
 
   // ── SMS ──
@@ -533,6 +561,15 @@ export async function sendPaymentLink(
       channels.sms = 'failed';
       errors.push(err instanceof Error ? err.message : 'SMS send threw');
     }
+  } else if (shouldSms && !customer.phone) {
+    // Issue 1 — only reachable on method='both' (a single-channel 'sms'
+    // request to a missing phone is hard-failed at the gate above). The
+    // customer has no phone, so we skip the channel and surface a warning
+    // rather than silently dropping it; the email channel still dispatches.
+    channels.sms = 'skipped';
+    errors.push(
+      'Customer has no phone number on file — payment link not sent via SMS'
+    );
   }
 
   const sentCount =
