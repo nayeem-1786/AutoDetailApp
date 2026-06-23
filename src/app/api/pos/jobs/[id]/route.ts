@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
-import { toCents } from '@/lib/utils/refund-math';
+import { toCents } from '@/lib/utils/money';
+import { computeBalanceDue } from '@/lib/data/transaction-totals';
 
 // Session #149 (Item 3) — added payment_link_paid_at +
 // payment_link_amount_cents to the appointment embed so the POS
@@ -75,7 +76,10 @@ async function attachAmountDueCents(
     );
   }
 
-  appt.amount_due_cents = Math.max(0, totalCents - paidCents);
+  appt.amount_due_cents = computeBalanceDue({
+    appointmentTotalCents: totalCents,
+    totalPaidCents: paidCents,
+  });
 }
 
 /**

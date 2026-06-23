@@ -252,7 +252,7 @@ async function mapTransactionRow(
     // Re-fetches even when isDeposit since we need it for both branches.
     const { data: apptForBalance } = await supabase
       .from('appointments')
-      .select('total_amount')
+      .select('total_amount, payment_status')
       .eq('id', raw.appointment_id)
       .maybeSingle();
 
@@ -284,7 +284,9 @@ async function mapTransactionRow(
 
       const block = composeReceiptPaymentLines(
         composerInput,
-        apptForBalance ? { total_amount: Number(apptForBalance.total_amount) } : null
+        apptForBalance
+          ? { total_amount: Number(apptForBalance.total_amount), payment_status: apptForBalance.payment_status }
+          : null
       );
 
       // Re-attach the original DB row alongside composer-derived source_label

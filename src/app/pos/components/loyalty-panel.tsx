@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { LOYALTY, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { centsToPoints } from '@/lib/loyalty/redemption-math';
+import { toCents } from '@/lib/utils/money';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { useTicket } from '../context/ticket-context';
 import { usePosPermission } from '../context/pos-permission-context';
@@ -66,14 +68,18 @@ export function LoyaltyPanel() {
 
     // Clamp to max
     const clamped = Math.min(dollarAmount, maxRedemption);
-    // Convert to points: dollars / rate
-    const pointsToRedeem = Math.ceil(clamped / LOYALTY.REDEEM_RATE);
+    // Convert dollars → points via the canonical helper. centsToPoints applies
+    // Math.ceil (customer-favoring) and folds the balance clamp in, replacing the
+    // former Math.ceil(clamped / REDEEM_RATE) + Math.min(_, balance) pair.
+    // Behavior-equivalent (Batch M, verified across 5 cases). The actualDiscount
+    // UX-boundary rounding below STAYS inline per the Phase-1 Q3 lock.
+    const pointsToRedeem = centsToPoints(toCents(clamped), balance);
     // Actual discount (may be slightly adjusted by rounding)
     const actualDiscount = Math.round(Math.min(pointsToRedeem * LOYALTY.REDEEM_RATE, maxRedemption) * 100) / 100;
 
     dispatch({
       type: 'SET_LOYALTY_REDEEM',
-      points: Math.min(pointsToRedeem, balance),
+      points: pointsToRedeem,
       discount: actualDiscount,
     });
     setShowInput(false);

@@ -6,6 +6,7 @@ import { sendEmail } from '@/lib/utils/email';
 import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
 import { LOYALTY } from '@/lib/utils/constants';
 import { fetchReceiptData } from '@/lib/data/receipt-data';
+import { computeGrandTotal } from '@/lib/data/transaction-totals';
 import { formatReceiptDateTime } from '@/lib/utils/format';
 import { getLineItemPricingInfo } from '@/lib/quotes/line-item-pricing';
 
@@ -77,7 +78,7 @@ ${itemLines}
 
 Subtotal: $${tx.subtotal.toFixed(2)}
 Tax: $${tx.tax_amount.toFixed(2)}
-${(() => { const nld = tx.discount_amount - (tx.loyalty_discount || 0); return nld > 0 ? `${tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount'}: -$${nld.toFixed(2)}\n` : ''; })()}${tx.loyalty_discount && tx.loyalty_discount > 0 ? `Loyalty (${tx.loyalty_points_redeemed || 0} pts): -$${tx.loyalty_discount.toFixed(2)}\n` : ''}${tx.tip_amount > 0 ? `Tip: $${tx.tip_amount.toFixed(2)}\n` : ''}Total: $${(tx.total_amount + tx.tip_amount).toFixed(2)}
+${(() => { const nld = tx.discount_amount - (tx.loyalty_discount || 0); return nld > 0 ? `${tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount'}: -$${nld.toFixed(2)}\n` : ''; })()}${tx.loyalty_discount && tx.loyalty_discount > 0 ? `Loyalty (${tx.loyalty_points_redeemed || 0} pts): -$${tx.loyalty_discount.toFixed(2)}\n` : ''}${tx.tip_amount > 0 ? `Tip: $${tx.tip_amount.toFixed(2)}\n` : ''}Total: $${computeGrandTotal({ appointment_total: tx.appointment_total, total_amount: tx.total_amount, tip_amount: tx.tip_amount }).toFixed(2)}
 
 Payment:
 ${paymentLines}

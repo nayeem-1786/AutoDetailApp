@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { toCents } from '@/lib/utils/refund-math';
-import { STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
+import { toCents, STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
+import { computeBalanceDue } from '@/lib/data/transaction-totals';
 import { getBusinessInfo } from '@/lib/data/business';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -107,7 +107,10 @@ export async function POST(
       );
     }
 
-    const remainingCents = Math.max(0, totalCents - paidCents);
+    const remainingCents = computeBalanceDue({
+      appointmentTotalCents: totalCents,
+      totalPaidCents: paidCents,
+    });
 
     if (remainingCents <= 0) {
       return NextResponse.json({ alreadyPaid: true });

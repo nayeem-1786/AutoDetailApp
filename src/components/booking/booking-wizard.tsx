@@ -972,6 +972,9 @@ export function BookingWizard({
         (prev.config?.mobile_surcharge ?? 0);
       const remainingAfterCoupon = subtotal - couponDiscount;
 
+      // Deliberate Math.floor (business-favoring redemption cap). DO NOT convert
+      // to centsToPoints — that uses Math.ceil (customer-favoring) and would
+      // silently flip the rounding direction (Batch M floor-cap lock).
       const maxPointsForBalance = Math.floor(remainingAfterCoupon / LOYALTY.REDEEM_RATE);
       const maxLoyaltyPointsRaw = Math.min(prev.loyaltyPointsBalance, maxPointsForBalance);
       const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / LOYALTY.REDEEM_MINIMUM) * LOYALTY.REDEEM_MINIMUM;
@@ -993,6 +996,9 @@ export function BookingWizard({
         (prev.config?.mobile_surcharge ?? 0);
       const remainingAfterCoupon = subtotal - couponDiscount;
 
+      // Deliberate Math.floor (business-favoring redemption cap). DO NOT convert
+      // to centsToPoints — that uses Math.ceil (customer-favoring) and would
+      // silently flip the rounding direction (Batch M floor-cap lock).
       const maxPointsForBalance = Math.floor(remainingAfterCoupon / LOYALTY.REDEEM_RATE);
       const maxLoyaltyPointsRaw = Math.min(prev.loyaltyPointsBalance, maxPointsForBalance);
       const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / LOYALTY.REDEEM_MINIMUM) * LOYALTY.REDEEM_MINIMUM;

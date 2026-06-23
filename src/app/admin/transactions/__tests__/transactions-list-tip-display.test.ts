@@ -129,10 +129,13 @@ describe('Admin Transactions LIST — Tip cell + canonical Total (Session #156)'
     );
   });
 
-  it('case 5: canonical Total formula present (byte-equivalent to Session #155 detail-view fix)', () => {
-    // Total cell delegates to a pre-computed `canonicalTotal` variable
+  it('case 5: canonical Total via computeGrandTotal helper (Batch M migration of Session #155 formula)', () => {
+    // Total cell delegates to a pre-computed `canonicalTotal` variable. Batch M
+    // (Option A Phase 2) migrated the inline `Math.max(...) + tip` formula to the
+    // canonical computeGrandTotal helper — the max+tip semantics are now owned by
+    // src/lib/data/transaction-totals.ts and unit-tested there.
     expect(SOURCE).toMatch(
-      /const canonicalTotal =\s*Math\.max\(appointmentTotal \?\? 0, tx\.total_amount\) \+ \(tx\.tip_amount \?\? 0\);/,
+      /const canonicalTotal = computeGrandTotal\(\{\s*appointment_total: appointmentTotal,\s*total_amount: tx\.total_amount,\s*tip_amount: tx\.tip_amount,\s*\}\);/,
     );
     // And the cell renders it
     expect(SOURCE).toMatch(/\{formatCurrency\(canonicalTotal\)\}/);

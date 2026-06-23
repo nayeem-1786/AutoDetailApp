@@ -10,7 +10,8 @@ import {
   composeLoyaltyFooter,
   RECEIPT_VOCAB,
 } from '@/lib/data/receipt-composer';
-import { toCents } from '@/lib/utils/refund-math';
+import { toCents } from '@/lib/utils/money';
+import { computeGrandTotal, computeBalanceDue } from '@/lib/data/transaction-totals';
 import { getLineItemPricingInfo } from '@/lib/quotes/line-item-pricing';
 import { renderTierToken } from '@/lib/quotes/tier-display';
 
@@ -720,7 +721,11 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   // Handles both close-out shells (transaction is $0, appointment carries
   // gross) AND in-store sales that exceed appointment value (transaction
   // carries gross, appointment is stale).
-  const grandTotal = Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount;
+  const grandTotal = computeGrandTotal({
+    appointment_total: tx.appointment_total,
+    total_amount: tx.total_amount,
+    tip_amount: tx.tip_amount,
+  });
   lines.push({
     type: 'columns',
     left: 'TOTAL',
@@ -821,7 +826,10 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   // value is missing.
   const appointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
   const transactionTotalCents = toCents(Number(tx.total_amount ?? 0));
-  const fallbackBalanceCents = Math.max(0, transactionTotalCents - totalPaidCents);
+  const fallbackBalanceCents = computeBalanceDue({
+    appointmentTotalCents: transactionTotalCents,
+    totalPaidCents,
+  });
   const balanceCents = tx.appointment_balance_due !== undefined
     ? tx.appointment_balance_due
     : (tx.payments.length > 0 && transactionTotalCents > 0 ? fallbackBalanceCents : undefined);
@@ -1223,7 +1231,10 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     // transaction-level totals when appointment_balance_due is undefined.
     const htmlAppointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
     const htmlTransactionTotalCents = toCents(Number(tx.total_amount ?? 0));
-    const htmlFallbackBalanceCents = Math.max(0, htmlTransactionTotalCents - htmlTotalPaidCents);
+    const htmlFallbackBalanceCents = computeBalanceDue({
+      appointmentTotalCents: htmlTransactionTotalCents,
+      totalPaidCents: htmlTotalPaidCents,
+    });
     const htmlBalanceCents = tx.appointment_balance_due !== undefined
       ? tx.appointment_balance_due
       : (tx.payments.length > 0 && htmlTransactionTotalCents > 0 ? htmlFallbackBalanceCents : undefined);
@@ -1479,7 +1490,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
            policy in this same file. Phase 1A LOCKED-5: no longer branches on
            tx.is_deposit ("TOTAL CHARGED" relabel + EST. BALANCE DUE row +
            "Final balance may include additional services" footnote retired). -->
-      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${(Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount).toFixed(2)}</td>
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${computeGrandTotal({ appointment_total: tx.appointment_total, total_amount: tx.total_amount, tip_amount: tx.tip_amount }).toFixed(2)}</td>
     </tr>
     ${tx.linked_receipt ? `<tr>
       <td colspan="2" style="padding:6px 0;font-size:12px;color:#2563eb;text-align:center;">See also: ${esc(tx.linked_receipt.label)} #${esc(tx.linked_receipt.receipt_number)}</td>

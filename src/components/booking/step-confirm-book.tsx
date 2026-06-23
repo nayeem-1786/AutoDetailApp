@@ -207,6 +207,9 @@ export function StepConfirmBook({
     : 0;
   const remainingAmount = paymentOption === 'deposit' ? grandTotal - depositAmount : 0;
 
+  // Deliberate Math.floor (business-favoring redemption cap). DO NOT convert to
+  // centsToPoints — that uses Math.ceil (customer-favoring) and would silently
+  // flip the rounding direction (Batch M floor-cap lock).
   const maxLoyaltyPointsRaw = Math.min(
     loyaltyPointsBalance,
     Math.floor((subtotal - couponDiscount) / LOYALTY.REDEEM_RATE)
