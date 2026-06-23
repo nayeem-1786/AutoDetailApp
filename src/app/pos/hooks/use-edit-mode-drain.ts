@@ -342,10 +342,22 @@ export async function runEditModeDrain(
     });
   }
 
-  // Coupon re-validation — same as handleCheckout. If the code is no longer
-  // valid (sold out / expired / customer no longer qualifies), the drain
-  // continues without a coupon applied; the cart still hydrates with services.
+  // Coupon re-validation. If the code is no longer valid (sold out / expired /
+  // customer no longer qualifies / yields $0 against the current cart) the
+  // drain continues WITHOUT a coupon applied — the cart still hydrates with
+  // services. The drop LOGIC is unchanged; Q3 (#160) makes the drop VISIBLE:
+  // every no-SET_COUPON terminal now surfaces an operator toast —
+  //   • toast.warning for business-invalid (expired / consumed / ineligible /
+  //     min-spend / 200-but-$0), passing the server's reason string through;
+  //   • toast.error for system failures (5xx / network throw / unreadable
+  //     body / 403) where the coupon's validity is UNKNOWN and a legitimate
+  //     discount may otherwise be silently lost.
+  // 401 never reaches here — posFetch intercepts it and redirects to login (the
+  // await never settles), so it is intentionally NOT toasted.
+  // KNOWN-RELATED (not fixed here): pos/jobs/page.tsx handleCheckout (~271-309)
+  // has the identical silent-drop bug class — flagged for a follow-up session.
   if (data.coupon_code) {
+    const code = data.coupon_code;
     try {
       const cartItems = ticketData.items.map((ti) => ({
         item_type: ti.itemType,
@@ -360,7 +372,7 @@ export async function runEditModeDrain(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: data.coupon_code,
+          code,
           subtotal: ticketData.subtotal,
           customer_id: data.customer_id,
           items: cartItems,
@@ -378,10 +390,39 @@ export async function runEditModeDrain(
               discount: couponData.total_discount,
             },
           });
+        } else if (couponData) {
+          // P1 — 200 OK, coupon structurally valid but yields no discount
+          // against the current cart (reward matches nothing). Recoverable.
+          toast.warning(`Coupon ${code} no longer applies to these items — removed`);
+        } else {
+          // P2 — 200 OK but no `data` payload (contract drift / proxy). The
+          // coupon's validity is unknown → treat as a system failure.
+          toast.error(`Coupon ${code} couldn't be re-checked — re-apply before saving`);
+        }
+      } else {
+        // Non-OK HTTP. 400/404 are business-invalid and carry a human-readable
+        // `error` reason; 403 (permission) and 5xx are system failures.
+        let serverError: string | null = null;
+        try {
+          const errJson = await validateRes.json();
+          if (errJson && typeof errJson.error === 'string') {
+            serverError = errJson.error;
+          }
+        } catch {
+          // error body unreadable — fall through to a generic reason
+        }
+        if (validateRes.status === 400 || validateRes.status === 404) {
+          // P3 (business-invalid) — surface the server's reason verbatim.
+          toast.warning(`Coupon ${code} removed — ${serverError ?? 'no longer valid'}`);
+        } else {
+          // P3 (403) / P4 (5xx) — system failure; validity unknown.
+          toast.error(`Coupon ${code} couldn't be re-checked — re-apply before saving`);
         }
       }
     } catch {
-      // Coupon revalidate failed — swallow; ticket already hydrated.
+      // P5 (network throw) / P6 (200 body unreadable) — validity unknown.
+      // Drop logic unchanged (ticket already hydrated); surface a system error.
+      toast.error(`Coupon ${code} couldn't be re-checked — re-apply before saving`);
     }
   }
 

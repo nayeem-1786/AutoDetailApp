@@ -30,6 +30,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
+import { toast } from 'sonner';
 import {
   isUuid,
   isSafeInternalPath,
@@ -102,7 +103,20 @@ function makeLoadData(overrides: Partial<LoadResponseData> = {}): LoadResponseDa
 
 beforeEach(() => {
   fetchMock.mockReset();
+  vi.mocked(toast.warning).mockClear();
+  vi.mocked(toast.error).mockClear();
+  vi.mocked(toast.success).mockClear();
+  vi.mocked(toast.info).mockClear();
 });
+
+// A 200 OK response whose body is NOT valid JSON — `.json()` rejects. Used to
+// exercise the P6 path (validateRes.ok true, but the body can't be parsed).
+function badJsonResponse(status = 200): Response {
+  return new Response('<<not json>>', {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Validators
@@ -397,16 +411,22 @@ describe('runEditModeDrain — endpoint selection + dispatch sequence', () => {
     expect(couponCall).toBeTruthy();
     expect(couponCall![0].coupon.code).toBe('SUMMER10');
     expect(couponCall![0].coupon.discount).toBe(18);
+    // Q3 regression guard: a valid coupon applies cleanly — no drop toast fires.
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it('continues silently if coupon revalidate fails (cart still hydrated)', async () => {
+  it('surfaces a warning toast (server reason) and drops the coupon on a 400 (business-invalid)', async () => {
+    // Q3: revalidate returns 400 with a human-readable reason. The coupon is
+    // still dropped (cart hydrates without it) but the operator now SEES why,
+    // via the server's `error` string passed through verbatim.
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse({
           data: makeLoadData({ coupon_code: 'EXPIRED' }),
         })
       )
-      .mockResolvedValueOnce(emptyResponse(400));
+      .mockResolvedValueOnce(jsonResponse({ error: 'Coupon has expired' }, 400));
     const dispatch = vi.fn();
     const result = await runEditModeDrain(
       {
@@ -416,9 +436,14 @@ describe('runEditModeDrain — endpoint selection + dispatch sequence', () => {
       },
       dispatch
     );
+    // Drop behavior UNCHANGED — drain still succeeds, coupon still absent.
     expect(result.ok).toBe(true);
     expect(dispatch.mock.calls.some((c) => c[0].type === 'ENTER_EDIT_MODE')).toBe(true);
     expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    // ADDITIVE visibility — warning fires, carrying the server reason verbatim.
+    expect(toast.warning).toHaveBeenCalledTimes(1);
+    expect(toast.warning).toHaveBeenCalledWith('Coupon EXPIRED removed — Coupon has expired');
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('dispatches MARK_EDIT_INITIAL_STATE as the FINAL action (Layer 8c dirty baseline)', async () => {
@@ -464,6 +489,137 @@ describe('runEditModeDrain — endpoint selection + dispatch sequence', () => {
     const markIdx = types.indexOf('MARK_EDIT_INITIAL_STATE');
     expect(couponIdx).toBeGreaterThanOrEqual(0);
     expect(markIdx).toBeGreaterThan(couponIdx);
+  });
+});
+
+describe('runEditModeDrain — coupon-drop visibility (Q3)', () => {
+  // Each case loads an appointment carrying a coupon, then the SECOND fetch
+  // (the /api/pos/coupons/validate call) determines which no-SET_COUPON
+  // terminal fires. Drop behavior is unchanged across all of them — the drain
+  // returns ok:true and the cart hydrates WITHOUT the coupon; the fix is the
+  // ADDITIVE operator toast. 401 is intentionally not covered: posFetch
+  // intercepts it and never settles, so it cannot reach a toast.
+  async function drainWithCoupon(queueValidateResponse: () => void) {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ data: makeLoadData({ coupon_code: 'SUMMER10' }) })
+    );
+    queueValidateResponse();
+    const dispatch = vi.fn();
+    const result = await runEditModeDrain(
+      {
+        source: 'appointment',
+        id: APPT_UUID,
+        returnTo: '/admin/appointments/' + APPT_UUID,
+      },
+      dispatch
+    );
+    return { result, dispatch };
+  }
+
+  const SYSTEM_FAILURE_MSG =
+    "Coupon SUMMER10 couldn't be re-checked — re-apply before saving";
+
+  it('P1 — 200 OK but total_discount=0: warning, coupon dropped, drain still ok', async () => {
+    const { result, dispatch } = await drainWithCoupon(() =>
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ data: { id: 'c1', code: 'SUMMER10', total_discount: 0, rewards: [] } })
+      )
+    );
+    expect(result.ok).toBe(true);
+    expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    expect(toast.warning).toHaveBeenCalledWith(
+      'Coupon SUMMER10 no longer applies to these items — removed'
+    );
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('P2 — 200 OK but no data payload: error, coupon dropped, drain still ok', async () => {
+    const { result, dispatch } = await drainWithCoupon(() =>
+      fetchMock.mockResolvedValueOnce(jsonResponse({ notData: true }))
+    );
+    expect(result.ok).toBe(true);
+    expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(SYSTEM_FAILURE_MSG);
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it('P3 (404) — business-invalid: warning surfaces the server reason', async () => {
+    const { result, dispatch } = await drainWithCoupon(() =>
+      fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Invalid coupon code' }, 404))
+    );
+    expect(result.ok).toBe(true);
+    expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    expect(toast.warning).toHaveBeenCalledWith('Coupon SUMMER10 removed — Invalid coupon code');
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('P3 (400) with unreadable body: warning uses the generic fallback reason', async () => {
+    const { result, dispatch } = await drainWithCoupon(() =>
+      fetchMock.mockResolvedValueOnce(badJsonResponse(400))
+    );
+    expect(result.ok).toBe(true);
+    expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    expect(toast.warning).toHaveBeenCalledWith('Coupon SUMMER10 removed — no longer valid');
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('P3 (403) — permission failure: error (validity unknown)', async () => {
+    const { result, dispatch } = await drainWithCoupon(() =>
+      fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Forbidden' }, 403))
+    );
+    expect(result.ok).toBe(true);
+    expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(SYSTEM_FAILURE_MSG);
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it('P4 — 5xx server error: error (validity unknown)', async () => {
+    const { result, dispatch } = await drainWithCoupon(() =>
+      fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Internal server error' }, 500))
+    );
+    expect(result.ok).toBe(true);
+    expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(SYSTEM_FAILURE_MSG);
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it('P5 — network throw on the validate call: error (validity unknown)', async () => {
+    const { result, dispatch } = await drainWithCoupon(() =>
+      fetchMock.mockRejectedValueOnce(new Error('network down'))
+    );
+    expect(result.ok).toBe(true);
+    expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(SYSTEM_FAILURE_MSG);
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it('P6 — 200 OK but body is unparseable JSON: error (validity unknown)', async () => {
+    const { result, dispatch } = await drainWithCoupon(() =>
+      fetchMock.mockResolvedValueOnce(badJsonResponse(200))
+    );
+    expect(result.ok).toBe(true);
+    expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(SYSTEM_FAILURE_MSG);
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it('no coupon_code on the record: validate never called, no drop toast', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: makeLoadData() }));
+    const dispatch = vi.fn();
+    const result = await runEditModeDrain(
+      {
+        source: 'appointment',
+        id: APPT_UUID,
+        returnTo: '/admin/appointments/' + APPT_UUID,
+      },
+      dispatch
+    );
+    expect(result.ok).toBe(true);
+    // Only the load endpoint is hit — no /coupons/validate round-trip.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });
 

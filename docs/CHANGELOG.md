@@ -6,6 +6,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos-edit-mode): Q3 — surface coupon revalidation failures to operator (2026-06-22, Session #160)
+
+Q3 follow-up from `docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md`. **UX-visibility fix:** the POS edit-mode deep-link drain (`/pos?source=appointment&id=…`) re-validates a saved coupon against `/api/pos/coupons/validate` on load. When the coupon no longer applies (expired / single-use consumed / customer no longer qualifies / yields $0 against the current cart) the drain dropped it **silently** — the operator saw no warning and the customer lost their discount entitlement with no trace. The drop is now surfaced as an operator toast. The underlying drop LOGIC is unchanged (an invalid coupon is still not applied); this is additive visibility so the operator can re-apply a different coupon, discount manually, or proceed knowingly.
+
+### Audit finding — six silent drop paths (read-only workflow, pre-implementation)
+
+The ticket named 4 edge cases; the audit (5 parallel read-only agents) found **six** distinct no-`SET_COUPON` terminals when `data.coupon_code` is truthy, and corrected the ticket's framing of the validate-endpoint contract:
+
+- **P1** — HTTP 200 with `total_discount === 0`: coupon is structurally valid but its reward matches nothing in the current cart. (The ticket's "200 with `invalid:true`" is a mislabel — the endpoint has no `invalid` flag and never returns `data:null`; the real trigger is the zero amount, detectable only by inspecting the number.) → **warning**
+- **P2** — HTTP 200 but no `data` payload (contract drift / proxy). → **error**
+- **P3** — 4xx: **400/404** are business-invalid and carry a human-readable `error` string (e.g. "Coupon has expired", "Coupon usage limit reached"); **403** is a permission failure. → 400/404 **warning** (server reason passed through verbatim), 403 **error**
+- **P4** — 5xx internal error. → **error**
+- **P5** — network throw (caught by the existing outer `catch`). → **error**
+- **P6** — `res.json()` throws *after* a 200 (lives inside the ok-branch, terminates via the same outer `catch`) — a path none of the 4 named edge cases covered. → **error**
+- **401 is intentionally NOT toasted** — `posFetch` intercepts 401, redirects to `/pos/login`, and returns a never-settling promise, so the await never resolves and no toast can fire.
+
+Loyalty and manual-discount hydration carry **no drop risk** — they are re-applied verbatim from the loaded record and never revalidated against a live endpoint. The coupon is the only modifier whose validity can change between save and re-open, so it is the only one that can be silently invalidated.
+
+### Wording (operator-locked — Option 1, Split + server reason)
+
+- **Business-invalid → `toast.warning`** (recoverable; proceed without it):
+  - 400/404 with server reason: `Coupon {code} removed — {server error}` (e.g. `Coupon SUMMER10 removed — Coupon has expired`)
+  - 200 / $0 against cart: `Coupon {code} no longer applies to these items — removed`
+  - 4xx with unreadable body: `Coupon {code} removed — no longer valid`
+- **System failure → `toast.error`** (validity unknown; a legitimate discount may be silently lost): `Coupon {code} couldn't be re-checked — re-apply before saving` (P2 / P4 / P5 / P6 / 403)
+
+### What shipped
+
+- **`src/app/pos/hooks/use-edit-mode-drain.ts` MOD** — the coupon-revalidation block in `runEditModeDrain` now routes every no-`SET_COUPON` terminal to a `toast.warning` (business-invalid, server reason passed through) or `toast.error` (system failure). `toast` was already imported (the hook's top-level 403/404/generic error toasts use it). Drop behavior, the return signature, and the `MARK_EDIT_INITIAL_STATE` ordering are unchanged. ~17 added lines.
+- **`src/app/pos/hooks/__tests__/use-edit-mode-drain.test.ts` MOD** — the existing "continues silently if coupon revalidate fails" test repurposed to assert the P3-400 warning carries the server reason verbatim; new `coupon-drop visibility (Q3)` describe block (P1, P2, P3-404, P3-400-unreadable-body, P3-403, P4, P5, P6, plus a no-coupon negative path asserting `/coupons/validate` is never called); no-toast regression guard added to the valid-coupon success path. 35/35 vitest pass.
+
+### Gates
+
+tsc 3 baseline errors preserved (all in `src/lib/quotes/__tests__/customer-accept-service.test.ts`; zero in touched files) · lint 0 · vitest 35/35 · `npm run build` exit 0.
+
+### Known-related, not fixed here
+
+`src/app/pos/jobs/page.tsx:271-309` (`handleCheckout`, the job-checkout coupon auto-apply the drain mirrors byte-for-byte) has the **identical silent-drop bug class** — same `if (validateRes.ok)` + `total_discount > 0` gate, same empty `catch`. It is **out of scope** for this session and flagged for a follow-up so the two mirrored sites don't drift. `quote-builder.tsx` and `ticket-context.tsx` already toast on drop and were the reference patterns for this fix.
+
+---
+
 ## feat(pay-link): Item 2 — Tip on full-payment Stripe payment link (Path Y) (2026-06-20, Session #159)
 
 Wave 2 Item 2 ships, completing the Wave-2 tip cluster's second of three items (Items 3 + 2 done; Item 4 cash-tip remains). **Tip selector on the customer-facing pay-link page, gated to full-payment links only.** Single-session ship per the roadmap Path A boundary, sized to the original 1-medium-session estimate.
