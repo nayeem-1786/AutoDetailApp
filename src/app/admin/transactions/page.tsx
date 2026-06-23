@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDateTime } from '@/lib/utils/format';
+import { computeGrandTotal } from '@/lib/data/transaction-totals';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import type {
   Transaction,
@@ -738,8 +739,11 @@ function TransactionTableRow({
   // `src/app/pos/components/transactions/transaction-detail.tsx:393`
   // (Session #155 / commit b91bccac) and the receipt-template rule at
   // `src/app/pos/lib/receipt-template.ts:723+:1482`.
-  const canonicalTotal =
-    Math.max(appointmentTotal ?? 0, tx.total_amount) + (tx.tip_amount ?? 0);
+  const canonicalTotal = computeGrandTotal({
+    appointment_total: appointmentTotal,
+    total_amount: tx.total_amount,
+    tip_amount: tx.tip_amount,
+  });
 
   // Subtitle gates narrowly on the close-out-shell marker, per operator
   // decision #5: preserves the affordance distinguishing close-out shells
@@ -915,8 +919,11 @@ function ExportButton({
         : null;
       // Canonical Total — mirrors the on-screen Total cell + receipt
       // template + detail-view fix from Session #155.
-      const canonicalTotal =
-        Math.max(appointmentTotal ?? 0, tx.total_amount) + (tx.tip_amount ?? 0);
+      const canonicalTotal = computeGrandTotal({
+        appointment_total: appointmentTotal,
+        total_amount: tx.total_amount,
+        tip_amount: tx.tip_amount,
+      });
 
       // Session #157: detailer first name from the first non-cancelled
       // job; mirrors the on-screen cell derivation in

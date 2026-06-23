@@ -32,6 +32,7 @@ import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { getBusinessInfo } from '@/lib/data/business';
 import { toCents, fromCents, STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
+import { computeBalanceDue } from '@/lib/data/transaction-totals';
 import { logAudit } from '@/lib/services/audit';
 import type { AuditSource } from '@/lib/supabase/types';
 
@@ -365,7 +366,10 @@ export async function sendPaymentLink(
       mostRecentPaymentCents = toCents(Number(payRows[0].amount));
     }
   }
-  const remainingCents = Math.max(0, totalCents - paidCents);
+  const remainingCents = computeBalanceDue({
+    appointmentTotalCents: totalCents,
+    totalPaidCents: paidCents,
+  });
   if (remainingCents <= 0) {
     return {
       success: false,

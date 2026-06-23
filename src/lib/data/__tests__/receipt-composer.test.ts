@@ -150,6 +150,37 @@ describe('composer: composeReceiptPaymentLines', () => {
     expect(block2.is_paid_in_full).toBe(true);
   });
 
+  // Batch M (Option A Phase 2) — Q-C: the composer now routes balance_due_cents
+  // through computeBalanceDue, plumbing appointment.payment_status as the dual-gate.
+  it('Q-C dual-gate: payment_status="paid" forces balance_due_cents=0 even when payments < total', () => {
+    // $50 paid against a $175 appointment → numeric balance would be $125, but
+    // the authoritative flag says paid (e.g. webhook-stamped, sum not yet settled).
+    const block = composeReceiptPaymentLines(
+      [{ id: 'p1', method: 'card', amount: 50, created_at: '2026-05-04T13:00:00.000-07:00' }],
+      { total_amount: 175, payment_status: 'paid' }
+    );
+    expect(block.balance_due_cents).toBe(0);
+    expect(block.is_paid_in_full).toBe(true);
+  });
+
+  it('Q-C dual-gate: omitted payment_status preserves numeric balance (back-compat)', () => {
+    const block = composeReceiptPaymentLines(
+      [{ id: 'p1', method: 'card', amount: 50, created_at: '2026-05-04T13:00:00.000-07:00' }],
+      { total_amount: 175 }
+    );
+    expect(block.balance_due_cents).toBe(12500);
+    expect(block.is_paid_in_full).toBe(false);
+  });
+
+  it('Q-C dual-gate: payment_status="partial" passes through to numeric math', () => {
+    const block = composeReceiptPaymentLines(
+      [{ id: 'p1', method: 'card', amount: 50, created_at: '2026-05-04T13:00:00.000-07:00' }],
+      { total_amount: 175, payment_status: 'partial' }
+    );
+    expect(block.balance_due_cents).toBe(12500);
+    expect(block.is_paid_in_full).toBe(false);
+  });
+
   it('detects source from notes prefix per LOCKED-5', () => {
     const payments: ComposerPaymentInput[] = [
       { method: 'card', amount: 50, source_notes: 'Online booking deposit. Service total: $175.', created_at: '2026-05-04T13:00:00.000-07:00' },

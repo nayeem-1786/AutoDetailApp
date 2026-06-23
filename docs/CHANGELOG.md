@@ -6,6 +6,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(option-a/phase-2): Batch M — money helper consumer migration (2026-06-23, Session #164)
+
+**Migrates the inlined grand-total + balance-due math to the Phase-1 canonical helpers — reuse-first, with ZERO new helpers.** Batch M of the Option A (Job Receipt Unification) arc, executing the operator-locked decisions from `docs/dev/PHASE_2_CONSUMER_MIGRATION_AUDIT_2026-06-22.md` and `docs/dev/PHASE_2_SUPPLEMENTARY_AUDIT_2026-06-22.md`. Solo/sequential — Batch M is one cohesive owner of the receipt / pay / webhook money files.
+
+### Migrated to canonical helpers
+
+- **`computeGrandTotal` (6 sites, dollars):** `pos/lib/receipt-template.ts:723` (thermal) + `:1482` (HTML) + `(public)/receipt/[token]/page.tsx:361` — the three **Variant-A** sites whose inline `Math.max(...) + tx.tip_amount` accessed tip **without** `?? 0` (latent `NaN` on undefined tip); the helper bakes in the guard. Plus `pos/components/transactions/transaction-detail.tsx:412` (Variant B) and `admin/transactions/page.tsx:742`/`:919` (Variant C, table row + CSV export).
+- **`computeBalanceDue` (9 sites, cents):** `payment-link/send.ts:368`, `webhooks/stripe/route.ts:152` (**DECISION caller — omits `paymentStatus`** so it never self-references while computing the new `payment_status`, per the Q1 bake-in), `(public)/pay/[token]/page.tsx:127` (**Q-B — passes `payment_status`**), `api/pay/[token]/intent/route.ts:110`, `api/pos/jobs/[id]/route.ts:78`, `lib/data/receipt-composer.ts:658` (**Q-C**), `pos/lib/receipt-template.ts:824`/`:1226`, and **`(public)/receipt/[token]/page.tsx:459`** — a **9th** site (the audit documented 8) surfaced during implementation: a public-receipt walk-in balance fallback byte-identical to `receipt-template.ts:824`. Migrated for consistency and flagged.
+
+### Latent bugs fixed (Q-D — close-out-shell receipts)
+
+The **SMS** (`api/pos/receipts/sms/route.ts:86`) and **email** (`api/pos/receipts/email/route.ts:80`) receipt totals computed `total_amount + tip` **without** the `Math.max(appointment_total, total_amount)` clamp, so a close-out-shell transaction (`total_amount = $0`, value carried on the appointment) rendered **`$0.00 + tip`** to the customer. Both now go through `computeGrandTotal`. The email path was a clean swap (`fetchReceiptData` already supplies `appointment_total`); the **SMS path needed a schema change** — its lightweight `transactions` SELECT had no appointment data, so a naive helper swap would have been a no-op. Added an `appointment:appointments(total_amount)` embed + a defensive object-or-array extraction (per the CLAUDE.md embed-cardinality rule) so the clamp actually fires.
+
+### Q-B / Q-C plumb-throughs
+
+- **Q-B (pay-page):** passing `payment_status` to `computeBalanceDue` folds the dual-gate into `remainingCents`, so the former `:191` guard simplifies to `isPaid = remainingCents <= 0` — provably equivalent to `payment_status === 'paid' || remainingCents <= 0`.
+- **Q-C (composer):** `composeReceiptPaymentLines` signature widened to `{ total_amount; payment_status? }`; `receipt-data.ts` adds `payment_status` to its appointment SELECT and passes it through. The only other caller (`checkout-items/route.ts`) already passed `null` — no change. As the supplementary audit predicted, this was trivial (2 files, no prop-drilling).
+
+### loyalty-panel `:70` (Q3-deferred from Phase 1)
+
+`Math.ceil(clamped / LOYALTY.REDEEM_RATE)` + `Math.min(_, balance)` → `centsToPoints(toCents(clamped), balance)`, folding the ceil-conversion and the balance clamp into one canonical call. The Q3-locked `actualDiscount` UX-boundary rounding stays inline. Behavior-equivalent across the 5 audit cases; the cents-intermediate path is also more robust than the `/0.05` float division.
+
+### Anti-regression + housekeeping
+
+- **3 floor-cap comments** (`booking-wizard.tsx:975`/`:996`, `step-confirm-book.tsx:212`): the deliberate `Math.floor` (business-favoring) redemption caps must **never** be "simplified" into `centsToPoints` (customer-favoring `Math.ceil`) — that would silently flip the rounding direction.
+- **6 `refund-math` → `money` import swaps**, free-on-touch in the Batch-M files only. The 13 non-Batch-M `refund-math` importers stay on the deprecation shim until Money-Unify-Final.
+
+### Deferred (operator-locked, per audit Q-A / Q-7)
+
+29 loyalty **display** sites stay on `LOYALTY.REDEEM_RATE` — both the new `pointsToDollars` variant and blanket `fromCents(pointsToCents(x))` composition were rejected (verbose, zero behavior gain, and composition is **unsafe** at the floor-cap sites). `customer-context.ts:127 dollarsToCents` is kept separate (an `isFinite`/string/null-guard superset of `toCents`, not a Batch-M file). H3 (`deriveSubtotalFromItems`) and H5 (`computeDisplayTotals`) → Phase 3.
+
+### Tests / Gates
+
+- **+8 tests:** composer Q-C dual-gate ×3 (`paid`→0 / omit→numeric / `partial`→numeric) added to `receipt-composer.test.ts`; new `loyalty-panel-redemption-migration.test.ts` (5-case equivalence). Updated `transactions-list-tip-display.test.ts` case 5 — a source-string regression test that pinned the old inline formula — to assert the migrated `computeGrandTotal({...})` call (intent preserved).
+- **Gates:** tsc 3 baseline preserved (`customer-accept-service.test.ts:44,49,73`, 0 new), lint 0 errors / 11 warnings (all pre-existing), vitest **0 new failures** (+8 passing). The 2 failures in `modifier-persistence.test.ts` are **pre-existing on clean main** — a `.ilike` Supabase-mock gap in vehicle classification, proven by stashing Batch M and re-running. Build clean (exit 0).
+- **Scope:** 16 prod files (~130 net LoC, within Memory #8), 2 test files modified + 1 new. No schema changes, no migrations, no new helpers.
+
+---
+
 ## fix(payment-link-receipt): Q4 — webhook writes transaction_items (Path A) (2026-06-22, Session #163)
 
 **Sparse payment-link receipts now render line items.** The Stripe webhook's `appointment_payment_link` branch created a `transactions` row + `payments` row but never inserted any `transaction_items`, so a customer opening their pay-link receipt (e.g. SD-06444) saw `Subtotal → Tax → TOTAL` over an **empty items block** — they knew what they paid, not what they paid for. Q4 follow-up to `docs/dev/JOB_RECEIPT_UNIFICATION_AUDIT_2026-06-20.md` (Q4, classified S0 — Receipt UX).

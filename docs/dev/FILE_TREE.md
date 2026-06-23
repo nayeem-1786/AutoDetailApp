@@ -1582,6 +1582,7 @@ Roadmap Item 15b (Cancel from POS Appointments + This Month filter) additions:
 Session 1.6 (Retire POS > Appointments tab) additions:
 - `src/__tests__/middleware.test.ts` — 4 tests: pins the `/pos/appointments` → `/pos/jobs?scope=schedule` 308 redirect + adjacent-route safety
 - `src/app/pos/components/__tests__/bottom-nav.test.tsx` — 3 tests: regression-locks the absence of the Appointments tab label + `/pos/appointments` href in the rendered POS bottom nav
+- `src/app/pos/components/__tests__/loyalty-panel-redemption-migration.test.ts` — Batch M (Option A Phase 2): 5-case behavior-equivalence lock for the loyalty-panel `:70` migration (`centsToPoints(toCents(clamped), balance)` === legacy `Math.min(Math.ceil(clamped / REDEEM_RATE), balance)`).
 
 Roadmap Item 15c ("Change Time" affordance on Jobs Card) additions:
 - `src/app/pos/jobs/components/change-time-button.tsx`

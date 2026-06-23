@@ -7,6 +7,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { buildSummaryLine } from '@/lib/sms/composites';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import { computeGrandTotal } from '@/lib/data/transaction-totals';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { normalizePhone } from '@/lib/utils/format';
 
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
         total_amount,
         tip_amount,
         customer_id,
+        appointment:appointments(total_amount),
         vehicle:vehicles(year, make, model)
       `)
       .eq('id', transaction_id)
@@ -82,8 +84,21 @@ export async function POST(request: NextRequest) {
     const receiptUrl = `${appUrl}/receipt/${transaction.access_token}`;
     const shortUrl = await createShortLink(receiptUrl);
 
-    // Format total (includes tip)
-    const grandTotal = Number(transaction.total_amount) + Number(transaction.tip_amount || 0);
+    // Format total (includes tip). computeGrandTotal applies the
+    // Math.max(appointment_total, total_amount) clamp so close-out-shell
+    // transactions (total_amount=$0, gross carried on the appointment) render
+    // the real total instead of $0.00 + tip (Batch M L1 fix). The appointment
+    // embed is a to-one FK; normalize object-or-array defensively.
+    const apptRel = transaction.appointment as
+      | { total_amount: number | string | null }
+      | { total_amount: number | string | null }[]
+      | null;
+    const apptTotal = Array.isArray(apptRel) ? apptRel[0]?.total_amount : apptRel?.total_amount;
+    const grandTotal = computeGrandTotal({
+      appointment_total: apptTotal != null ? Number(apptTotal) : null,
+      total_amount: Number(transaction.total_amount),
+      tip_amount: Number(transaction.tip_amount ?? 0),
+    });
     const total = `$${grandTotal.toFixed(2)}`;
 
     // Build summary_line composite caller-side (length-aware: truncates the

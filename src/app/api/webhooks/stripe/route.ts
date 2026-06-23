@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
 import { toCents, fromCents } from '@/lib/utils/money';
+import { computeBalanceDue } from '@/lib/data/transaction-totals';
 import { CC_FEE_RATE } from '@/lib/utils/constants';
 import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
 import { logAudit } from '@/lib/services/audit';
@@ -149,7 +150,12 @@ export async function POST(request: NextRequest) {
               );
             }
 
-            const remainingCents = Math.max(0, totalCents - paidSoFarCents);
+            // DECISION caller: computes the NEW payment_status below, so it
+            // must NOT pass paymentStatus (would self-reference). Q1 lock.
+            const remainingCents = computeBalanceDue({
+              appointmentTotalCents: totalCents,
+              totalPaidCents: paidSoFarCents,
+            });
             const amountReceivedCents = pi.amount_received ?? pi.amount;
 
             // Item 2 (2026-06-20) — tip extraction from PI metadata. The

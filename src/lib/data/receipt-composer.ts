@@ -15,7 +15,8 @@
  * suggested_* fields here.
  */
 
-import { toCents } from '@/lib/utils/refund-math';
+import { toCents } from '@/lib/utils/money';
+import { computeBalanceDue } from '@/lib/data/transaction-totals';
 import {
   derivePaymentSourceLabel,
   type PaymentMethodLike,
@@ -581,7 +582,7 @@ export function composeLoyaltyFooter(
  */
 export function composeReceiptPaymentLines(
   payments: ComposerPaymentInput[],
-  appointment: { total_amount: number } | null
+  appointment: { total_amount: number; payment_status?: string | null } | null
 ): RenderedPaymentBlock {
   // Chronological sort. Rows missing created_at fall to the end stably.
   const sorted = [...payments].sort((a, b) => {
@@ -655,7 +656,14 @@ export function composeReceiptPaymentLines(
   }
 
   const totalPaidCents = runningPaidCents;
-  const balanceDueCents = Math.max(0, appointmentTotalCents - totalPaidCents);
+  // Render/READ feed — pass payment_status (when the caller supplies it) so a
+  // webhook-stamped 'paid' appointment reports 0 balance even if the payment
+  // sum hasn't settled (Q1 dual-gate via computeBalanceDue, Q-C plumb-through).
+  const balanceDueCents = computeBalanceDue({
+    appointmentTotalCents,
+    totalPaidCents,
+    paymentStatus: appointment?.payment_status,
+  });
   // REVISED LOCKED-3: paid-in-full fires when a real bill existed and the
   // balance is now zero — regardless of whether the bill was zeroed by
   // tender, loyalty redemption, full coupon discount, etc. The earlier

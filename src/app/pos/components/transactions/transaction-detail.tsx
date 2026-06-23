@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { usePosPermission } from '../../context/pos-permission-context';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import { formatCurrency, formatDateTime, formatPhone } from '@/lib/utils/format';
+import { computeGrandTotal } from '@/lib/data/transaction-totals';
 import { formatCardBrand } from '@/lib/utils/card-brand';
 import { renderTierToken } from '@/lib/quotes/tier-display';
 import {
@@ -409,8 +410,11 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
                       public-receipt-page. Audit:
                       docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md (Surface D). */}
                   {formatCurrency(
-                    Math.max(transaction.appointment?.total_amount ?? 0, transaction.total_amount) +
-                      (transaction.tip_amount ?? 0)
+                    computeGrandTotal({
+                      appointment_total: transaction.appointment?.total_amount,
+                      total_amount: transaction.total_amount,
+                      tip_amount: transaction.tip_amount,
+                    })
                   )}
                 </span>
               </div>

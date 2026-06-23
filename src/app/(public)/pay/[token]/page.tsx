@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
-import { toCents, fromCents } from '@/lib/utils/refund-math';
+import { toCents, fromCents } from '@/lib/utils/money';
+import { computeBalanceDue } from '@/lib/data/transaction-totals';
 import { formatCurrency, formatTime, formatReceiptDateTime, formatPhone, phoneToE164 } from '@/lib/utils/format';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { PayForm } from './pay-form';
@@ -124,7 +125,14 @@ async function getAppointmentByToken(
     }
   }
 
-  const remainingCents = Math.max(0, totalCents - paidCents);
+  // Render/READ caller — pass payment_status so the dual-gate (Q1) gives the
+  // authoritative balance: a webhook-stamped 'paid' appointment shows 0 even if
+  // the payment-sum lookup hasn't settled. Drives `isPaid` below via remaining<=0.
+  const remainingCents = computeBalanceDue({
+    appointmentTotalCents: totalCents,
+    totalPaidCents: paidCents,
+    paymentStatus: appointment.payment_status,
+  });
   // Charge amount: custom-amount link (Pay-Link Session 5) honored when set,
   // else full remaining. Clamped so the page never displays/charges more than
   // what's actually owed if remaining shrunk after link was issued.
@@ -188,7 +196,10 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
   const retryCount = Math.max(0, Number.parseInt(retryCountRaw, 10) || 0);
 
   const isCancelled = appointment.status === 'cancelled' || appointment.status === 'no_show';
-  const isPaid = appointment.payment_status === 'paid' || remainingCents <= 0;
+  // computeBalanceDue (at remainingCents above) now folds the payment_status==='paid'
+  // gate into the numeric balance, so remainingCents<=0 already covers the flag —
+  // the former `payment_status === 'paid' || …` clause is now redundant (Q-B simplification).
+  const isPaid = remainingCents <= 0;
   // "This link has been consumed" state. Distinct from isPaid because the
   // appointment may still have outstanding balance (e.g., $1 deposit link on a
   // $400 ticket) — but THIS link's contract with the customer was fulfilled

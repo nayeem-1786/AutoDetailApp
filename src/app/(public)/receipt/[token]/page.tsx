@@ -13,7 +13,8 @@ import {
   composeLoyaltyFooter,
   RECEIPT_VOCAB,
 } from '@/lib/data/receipt-composer';
-import { toCents } from '@/lib/utils/refund-math';
+import { toCents } from '@/lib/utils/money';
+import { computeGrandTotal, computeBalanceDue } from '@/lib/data/transaction-totals';
 import {
   getLineItemPricingInfo,
   sumLineItemSavings,
@@ -358,7 +359,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                     gross) AND in-store sales that exceed appointment value (transaction
                     carries gross, appointment is stale). Mirrors the receipt-template.ts
                     policy. */}
-                {formatCurrency(Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount)}
+                {formatCurrency(computeGrandTotal({ appointment_total: tx.appointment_total, total_amount: tx.total_amount, tip_amount: tx.tip_amount }))}
               </span>
             </div>
             {tx.linked_receipt && (
@@ -455,7 +456,10 @@ export default async function PublicReceiptPage({ params }: PageProps) {
         // (pre-Phase-0a txns without an appointment).
         const appointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
         const transactionTotalCents = toCents(Number(tx.total_amount ?? 0));
-        const fallbackBalanceCents = Math.max(0, transactionTotalCents - totalPaidCents);
+        const fallbackBalanceCents = computeBalanceDue({
+          appointmentTotalCents: transactionTotalCents,
+          totalPaidCents,
+        });
         const resolvedBalanceCents = tx.appointment_balance_due !== undefined
           ? tx.appointment_balance_due
           : (tx.payments.length > 0 && transactionTotalCents > 0 ? fallbackBalanceCents : undefined);
