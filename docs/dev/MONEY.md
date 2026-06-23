@@ -194,7 +194,7 @@ family phases that follow.
 | H — Inventory | purchase_order_items, stock_adjustments, vendors | **Migrated (Unify-2)** — 3 cents columns added, backfilled, CHECK-constrained; legacy NUMERIC columns retained until Unify-Final; `void_transaction()` Postgres function writes cents; ~10 `// TODO Unify-D` shim sites tagged for Family D to clean up |
 | D — Catalog | services, service_pricing, products, packages | Pending (Unify-3) |
 | E — Orders | orders, order_items, shipping_settings | Pending (Unify-4) |
-| A — POS Transactions | transactions, transaction_items, payments, refunds, cash_drawers | Pending (Unify-5) |
+| A — POS Transactions | transactions, transaction_items, payments, refunds, cash_drawers | **Closed (2026-05-15)** — stays NUMERIC(10,2) dollars permanently per the epic-closure decision below; no cents migration |
 | C — Appointments | appointments, appointment_services, mobile_zones, job_addons | Pending (Unify-6) |
 | F — Marketing | coupons, coupon_rewards, campaigns | Pending (Unify-7) |
 | B — Quotes | quotes, quote_items | Pending (Unify-8) |
