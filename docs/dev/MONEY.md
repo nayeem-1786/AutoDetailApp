@@ -1,33 +1,52 @@
 # Money Handling — Canonical Model + Lint Rule
 
 > Single source of truth for how money is represented, stored, computed,
-> and rendered. Established in Phase **Money-Unify-1** as the foundation
-> of the Money-Unify epic. Read this before adding any new money-handling
-> code or changing existing money columns.
+> and rendered. Established in Phase **Money-Unify-1**; the broader
+> Money-Unify epic was **closed permanently on 2026-05-15** (see the
+> "Decision (2026-05-15)" section near the end of this doc) — but this
+> remains the canonical money model. Read this before adding any new
+> money-handling code or changing existing money columns.
 
 ## TL;DR
 
-- **Storage:** all money columns hold **integer cents** with a `_cents`
-  column-name suffix (e.g. `subtotal_cents`). The 12 columns that
-  already carry cents stay; the 65 NUMERIC(10,2) dollar columns migrate
-  to cents in the family phases that follow Unify-1.
-- **Code:** every variable that holds cents carries a `Cents`
-  (camelCase) or `_cents` (snake_case) suffix. The lint rule
-  **`money/no-unsuffixed-money-prop`** catches violations at write time.
-- **Math:** all arithmetic happens on integer cents. No `* 100` /
-  `/ 100` outside the converter helpers.
-- **Display:** `formatMoney(cents)` for all customer- and staff-facing
-  output. `formatMoneyForInput(cents)` for controlled dollar-edit
-  inputs. The legacy `formatCurrency(dollars)` survives the epic and is
-  removed at Unify-Final.
-- **External boundaries:** Stripe, Square cents in; QBO dollars out;
-  Shippo dollar strings in. Conversion happens once at the boundary.
+> **The Money-Unify epic was closed permanently on 2026-05-15** (see
+> "Decision (2026-05-15)" below). The bullets below describe the
+> post-closure canonical model, not an in-progress migration.
+
+- **Storage (per-family):** most money-bearing tables stay
+  **`NUMERIC(10,2)` dollars indefinitely** (catalog, transactions,
+  payments, cash_drawers, appointments, quotes, coupons, customers, and
+  every other table not already migrated). Only the **Inventory family
+  (Unify-2)** carries `_cents` columns — it shipped cleanly and is kept.
+  No further families migrate to cents.
+- **New columns:** a new money column **MUST match the existing unit of
+  the family it lives in** — do not add a lone `_cents` column to an
+  all-dollars table (that re-creates the dual-unit drift behind the
+  Unify-3 rollback).
+- **Math (precision-sensitive paths):** compute in **integer cents
+  internally, dollars at the I/O boundary** (e.g. `refund-math.ts`, and
+  the Phase 1 helpers in `src/lib/data/transaction-totals.ts` such as
+  `computeGrandTotal` / `computeBalanceDue`). Convert with `toCents()` /
+  `fromCents()` at the boundary.
+- **Display:** `formatCurrency(dollars)` for dollar values (the
+  dollars-canonical families — kept permanently); `formatMoney(cents)`
+  where the value is already integer cents (inventory, helper outputs).
+  `formatMoneyForInput(cents)` for controlled cents-edit inputs.
+- **Code naming:** a variable that holds cents carries a `Cents`
+  (camelCase) or `_cents` (snake_case) suffix; the
+  **`money/no-unsuffixed-money-prop`** lint rule flags a cents value
+  bound to an un-suffixed name. It does **not** mandate cents for new
+  columns.
+- **External boundaries:** Stripe & Square take cents
+  (`Math.round(dollars * 100)` at the payment-amount boundary); QBO
+  takes dollars; Shippo gives dollar strings. Conversion happens once at
+  the boundary.
 
 ## Canonical helper API
 
 All helpers live in `src/lib/utils/money.ts` (renamed from
 `src/lib/utils/refund-math.ts` in Unify-1; the old path survives as a
-`@deprecated` re-export shim through the epic).
+`@deprecated` re-export shim and is kept post-closure).
 
 | Helper | Signature | Purpose |
 | --- | --- | --- |
@@ -35,7 +54,7 @@ All helpers live in `src/lib/utils/money.ts` (renamed from
 | `fromCents(cents)` | `(number) => number` | Cents → dollars. Use only at boundaries that demand dollars (QBO, legacy renderers). Never inside business logic. |
 | `formatMoney(cents)` | `(number) => string` | Canonical formatter. Throws `TypeError` on non-integer / non-finite input. Lives in `src/lib/utils/format.ts`. |
 | `formatMoneyForInput(cents)` | `(number) => string` | `"17.64"` form (no `$`, no commas) for controlled `<input>` value bindings. Throws on non-integer input. |
-| `formatCurrency(dollars)` | `(number) => string` | **Legacy.** Survives the epic so per-family caller rewrites stay tractable. At Unify-Final, `formatMoney` is renamed to `formatCurrency` and this dollars-input version is deleted. |
+| `formatCurrency(dollars)` | `(number) => string` | **Canonical dollars-display formatter — kept permanently** (post-closure). Use for the dollars-canonical families (catalog, transactions, payments, appointments, quotes, coupons, customers). Not scheduled for removal. |
 | `STRIPE_MIN_AMOUNT_CENTS` | `50` | Stripe's minimum charge in cents. Single export consumed by all enforcement sites. |
 | `STRIPE_MIN_DOLLARS` | `0.50` | Derived (`STRIPE_MIN_AMOUNT_CENTS / 100`). Use for dollars-context enforcement only. |
 
@@ -45,8 +64,8 @@ Refund-math helpers (`computePerUnitRefundableCents`,
 are documented at the top of the file.
 
 Cents-context loyalty math uses `LOYALTY.REDEEM_RATE_CENTS = 5`
-(cents per point); the legacy `LOYALTY.REDEEM_RATE = 0.05` survives
-through the epic for dollars-context callers.
+(cents per point); `LOYALTY.REDEEM_RATE = 0.05` (dollars) serves
+dollars-context callers. Both constants coexist permanently post-closure.
 
 ## Cross-system synchronization points
 
@@ -73,9 +92,9 @@ the new floor. The derived dollars constant updates automatically.
 - `LOYALTY.REDEEM_RATE_CENTS` in `src/lib/utils/constants.ts`
   (cents, integer — added in Unify-1)
 
-Both coexist through the Money-Unify epic. At Unify-Final, the
-dollars-context float is removed and `REDEEM_RATE_CENTS` becomes the
-sole source.
+Both coexist permanently post-closure (2026-05-15). The dollars float
+serves dollars-context callers; the cents integer serves cents-context
+math. Neither is scheduled for removal.
 
 ## Naming convention
 
@@ -85,14 +104,18 @@ Every variable, parameter, object key, or column that holds cents
 - camelCase: `amountCents`, `subtotalCents`, `taxAmountCents`
 - snake_case: `amount_cents`, `subtotal_cents`, `tax_amount_cents`
 
-The 14 existing `*Dollars` / `*_dollars` identifiers survive as the
-explicit dollars-at-the-boundary marker. Use the dollars suffix when
-you genuinely need a dollar number (QBO body field, Shippo intake,
-legacy formatter input).
+The `*Dollars` / `*_dollars` identifiers are the explicit
+dollars-at-the-boundary marker. Use the dollars suffix when the value is
+a dollar number (QBO body field, Shippo intake, dollars-canonical
+column, legacy formatter input).
 
-Unnamed numeric literals carry cents. Write `amount: 5000`, not
-`amount: 50`. Dollar-literal constants must be re-expressed when they
-appear (`STRIPE_MIN_AMOUNT_CENTS = 50`, not `STRIPE_MINIMUM = 0.50`).
+**The suffix marks the unit a value is already in — it does not mandate
+which unit to choose.** In a dollars-canonical family (the default
+post-closure), money is in dollars and carries no `_cents` suffix; only
+add `_cents` when the value is genuinely integer cents (Inventory
+columns, `refund-math.ts` intermediates, Stripe-boundary amounts). A
+cents literal must be unambiguous at its site
+(`STRIPE_MIN_AMOUNT_CENTS = 50` cents, not a bare `50`).
 
 ## The lint rule — `money/no-unsuffixed-money-prop`
 
@@ -128,9 +151,8 @@ identifier whose name lacks the `Cents` / `_cents` suffix.
 | JSX attribute pass-through `<Foo bar={cents}>` | Receiving prop name is owned by the component, not the caller |
 
 The skip patterns mirror the conservative defaults that proved
-necessary for `phone/no-raw-display`. They will likely expand as the
-family phases surface real-world false positives — see "How to opt
-out" below for the per-line escape hatch.
+necessary for `phone/no-raw-display`. See "How to opt out" below for
+the per-line escape hatch.
 
 ## How to fix a violation
 
@@ -172,38 +194,37 @@ new code, that's a signal that something should be refactored instead.
 
 Currently configured as **`warn`** in `eslint.config.mjs`.
 
-`warn` (not `error`) because the family phases that follow Unify-1
-will surface a wave of warnings as they migrate dollar columns to
-cents. Each family phase brings its warning count down. When the count
-hits zero — or each remaining warning has a justified
-`eslint-disable-next-line` — the **Unify-Final** phase upgrades the
-rule to `error` and locks the convention.
-
-The TODO comment in `eslint.config.mjs` marks the exact line for the
-upgrade.
+`warn` (not `error`), and it **stays `warn` post-closure (2026-05-15)** —
+there is no Unify-Final phase to upgrade it. The rule remains a useful
+write-time signal that a cents value has been bound to an un-suffixed
+name (relevant for the Inventory family and `refund-math.ts`-style
+compute paths), but it does not gate the build and does not mandate
+cents for new columns.
 
 ## Migration status (post-Unify-1)
 
-Unify-1 establishes the helper surface and lint rule. It does **not**
-migrate any of the 65 NUMERIC(10,2) dollar columns or the 437
-dollars-context callers in the codebase — those are owned by the
-family phases that follow.
+Unify-1 established the helper surface and lint rule. The planned
+follow-on family phases (Unify-3 onward) were **cancelled when the epic
+closed on 2026-05-15** — the 65 `NUMERIC(10,2)` dollar columns and their
+dollars-context callers **stay dollars permanently**. Only the Inventory
+family (Unify-2) shipped cents. The table below records final per-family
+status.
 
 | Family | Tables | Status |
 | --- | --- | --- |
-| H — Inventory | purchase_order_items, stock_adjustments, vendors | **Migrated (Unify-2)** — 3 cents columns added, backfilled, CHECK-constrained; legacy NUMERIC columns retained until Unify-Final; `void_transaction()` Postgres function writes cents; ~10 `// TODO Unify-D` shim sites tagged for Family D to clean up |
-| D — Catalog | services, service_pricing, products, packages | Pending (Unify-3) |
-| E — Orders | orders, order_items, shipping_settings | Pending (Unify-4) |
+| H — Inventory | purchase_order_items, stock_adjustments, vendors | **Migrated (Unify-2) — kept post-closure** — 3 cents columns added, backfilled, CHECK-constrained; `void_transaction()` Postgres function writes cents. Legacy NUMERIC columns retained (the Unify-Final cleanup that would have dropped them is cancelled — no longer scheduled). ~10 `// TODO Unify-D` code shim sites remain orphaned (Family D cleanup cancelled — see flag at session end). |
+| D — Catalog | services, service_pricing, products, packages | **Closed (2026-05-15)** — stays NUMERIC(10,2) dollars permanently (rollback target of Unify-3; see postmortem above) |
+| E — Orders | orders, order_items, shipping_settings | **Closed (2026-05-15)** — stays NUMERIC(10,2) dollars permanently (rollback target of Unify-4; see postmortem above) |
 | A — POS Transactions | transactions, transaction_items, payments, refunds, cash_drawers | **Closed (2026-05-15)** — stays NUMERIC(10,2) dollars permanently per the epic-closure decision below; no cents migration |
-| C — Appointments | appointments, appointment_services, mobile_zones, job_addons | Pending (Unify-6) |
-| F — Marketing | coupons, coupon_rewards, campaigns | Pending (Unify-7) |
-| B — Quotes | quotes, quote_items | Pending (Unify-8) |
-| G — Customer Aggregate | customers | Pending (Unify-9) |
-| — | Cleanup + ADR | Pending (Unify-Final) |
+| C — Appointments | appointments, appointment_services, mobile_zones, job_addons | **Closed (2026-05-15)** — stays NUMERIC(10,2) dollars permanently |
+| F — Marketing | coupons, coupon_rewards, campaigns | **Closed (2026-05-15)** — stays NUMERIC(10,2) dollars permanently |
+| B — Quotes | quotes, quote_items | **Closed (2026-05-15)** — stays NUMERIC(10,2) dollars permanently |
+| G — Customer Aggregate | customers | **Closed (2026-05-15)** — stays NUMERIC(10,2) dollars permanently |
+| — | Cleanup + ADR | **Closed (2026-05-15)** — Unify-Final cancelled; no cleanup phase runs |
 
 See `docs/sessions/money-unify-0-migration-playbook-v2.md` for the
-full epic plan, decision recap, and per-family reconciliation
-strategies.
+full (now-historical) epic plan — superseded by the 2026-05-15 closure
+decision below.
 
 ## Lessons learned from the Money-Unify-3 rollback (2026-05-15)
 
@@ -343,8 +364,8 @@ question of whether to apply them at all is the decision recorded here.**
   `formatMoneyForInput`, legacy `formatCurrency`)
 - Loyalty constants: `src/lib/utils/constants.ts` (`LOYALTY.REDEEM_RATE`,
   `LOYALTY.REDEEM_RATE_CENTS`)
-- Deprecated re-export shim: `src/lib/utils/refund-math.ts` (deleted
-  at Unify-Final)
+- Deprecated re-export shim: `src/lib/utils/refund-math.ts`
+  (`@deprecated`; kept post-closure, not scheduled for deletion)
 - Lint rule: `eslint-rules/money-no-unsuffixed-money-prop.js`
 - Lint rule tests: `eslint-rules/__tests__/money-no-unsuffixed-money-prop.test.js`
 - Helper tests: `src/lib/utils/__tests__/money.test.ts`,
