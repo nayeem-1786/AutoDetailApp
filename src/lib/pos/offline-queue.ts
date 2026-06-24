@@ -32,6 +32,10 @@ export interface QueuedTransaction {
   vehicle_id: string | null;
   subtotal: number;
   tax_amount: number;
+  // Item 4 / 4a-cash: cash tip captured at checkout. Optional so records
+  // queued before this field existed (and any future non-cash queue path)
+  // still deserialize; the sync route defaults a missing value to 0.
+  tip_amount?: number;
   discount_amount: number;
   total_amount: number;
   coupon_id: string | null;

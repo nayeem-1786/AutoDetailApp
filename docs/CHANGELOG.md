@@ -6,6 +6,40 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(item-4/4a-cash): in-checkout cash tip capture (S1) (2026-06-24, Session #165)
+
+**Recovers cash tips that were silently lost on every cash sale.** First real Item 4 slice (4a-cash) per the audit's §7.1 ordering (`docs/dev/WAVE_2_ITEM_4_CASH_TIP_SPLITTING_REPORTING_AUDIT_2026-06-23.md`). Before this, the cash checkout hardcoded `tip_amount: 0` at both the transaction and payment-row grain, and the offline-sync replay re-hardcoded `0` — so a cashier had no way to record a cash tip. **Zero schema change** (columns already existed); reuse-first throughout.
+
+### What shipped
+
+- **Inline tip section on `cash-payment.tsx`** (audit Option A — NOT the orphaned `tip-screen.tsx`): **No tip** (default) / 15% / 20% / 25% / Custom chips + a custom-$ input + a `Tip: $X.XX` summary gated on `tipAmount > 0`. Presets are a % of **subtotal**, matching the card on-reader tip basis (`card-payment.tsx`). Dark variants on every chip + the input (rule #10).
+- **Zero-friction $0 default** (locked): a no-tip cash sale needs no tip interaction; `Complete` is gated only on tender (`isValid`), never on a tip choice.
+- The tip amount flows **only** through `checkout.tipAmount` / `checkout.setTip` (single source of truth — no second container). The two hardcoded `0`s (`cash-payment.tsx:153` txn grain, `:188` payment grain) + the offline queue payload (`:228`) now read `checkout.tipAmount`.
+- **`tip_net` is automatic** — the non-card else-branch at `transactions/route.ts:387-389` writes `tip_net = tip_amount` for cash; no special-casing.
+- **Change math unchanged** (locked decision / Appendix A bug #13): `change_given` is computed on the **service total** only — a tip never enters the tendered/change reconciliation (client, server recompute, AND offline replay).
+- **Offline path** (Appendix A bug #2, "Data loss"): `QueuedTransaction.tip_amount?` added (optional, back-compat for already-queued records); `sync-offline-transaction/route.ts` reads `body.tip_amount` (0 default for legacy records + negative clamp) and writes it at both grains with `tip_net = tip_amount`.
+
+### Money / precision
+
+Tip amounts stay `NUMERIC(10,2)` dollars (MONEY.md closure / CLAUDE.md #20 — `transactions`/`payments` are a dollars-canonical family). Preset/custom math uses the canonical integer-cents pattern (`fromCents(Math.round((toCents(subtotal) * pct) / 100))`, `fromCents(toCents(val))`) — no `toFixed(2)` ever touches a money value (only display strings).
+
+### Adversarial-review fixes (4-reviewer + verifier pass before commit)
+
+- **Chip rehydration across a step remount** — `checkout-overlay.tsx` conditionally renders `<CashPayment/>`, so it remounts on every step change while `checkout.tipAmount` persists. Without rehydration, returning to the cash step showed "No tip" highlighted while a tip was still charged (silent over-charge). Fixed by lazy-initializing the chip selection from `checkout.tipPercent`/`tipAmount` on mount; locked by a remount regression test.
+- **Offline-replay test coverage** — the route's replay logic (the second half of the offline path / Appendix A bug #2) had zero coverage; added a route-level test.
+
+### Files
+
+- `src/app/pos/components/checkout/cash-payment.tsx` — tip UI + wiring + rehydration
+- `src/app/api/pos/sync-offline-transaction/route.ts` — offline replay reads + persists the tip
+- `src/lib/pos/offline-queue.ts` — optional `tip_amount` on `QueuedTransaction`
+- `src/app/pos/components/checkout/__tests__/cash-payment-tip-capture.test.tsx` (new, 7 tests)
+- `src/app/api/pos/sync-offline-transaction/__tests__/tip-replay.test.ts` (new, 3 tests)
+
+~127 prod LoC. Gates: tsc (3 baseline preserved), lint clean, vitest 3625 pass (10 new) + 2 pre-existing `modifier-persistence` failures, build clean. Out of scope (untouched): `tip-screen.tsx`, `split-payment.tsx` cash leg, `transactions/[id]` PATCH (4a-post / S2), `roles` (S4), reports (S3), Phase-1 helpers.
+
+---
+
 ## feat(option-a/phase-2): Batch M — money helper consumer migration (2026-06-23, Session #164)
 
 **Migrates the inlined grand-total + balance-due math to the Phase-1 canonical helpers — reuse-first, with ZERO new helpers.** Batch M of the Option A (Job Receipt Unification) arc, executing the operator-locked decisions from `docs/dev/PHASE_2_CONSUMER_MIGRATION_AUDIT_2026-06-22.md` and `docs/dev/PHASE_2_SUPPLEMENTARY_AUDIT_2026-06-22.md`. Solo/sequential — Batch M is one cohesive owner of the receipt / pay / webhook money files.

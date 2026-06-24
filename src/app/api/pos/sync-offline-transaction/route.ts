@@ -68,6 +68,16 @@ export async function POST(request: NextRequest) {
       linkedApptId = linkedJob?.appointment_id ?? null;
     }
 
+    // Cash tip captured at offline checkout (Item 4 / 4a-cash). Default to 0
+    // for records queued before the field existed (Appendix A bug #2 — without
+    // reading this, even a fixed cash UI would lose the tip on replay). Cash
+    // tips take no CC-fee deduction, so tip_net = tip_amount, matching the
+    // non-card else-branch in transactions/route.ts.
+    const tipAmount =
+      typeof body.tip_amount === 'number'
+        ? Math.max(0, Math.round(body.tip_amount * 100) / 100)
+        : 0;
+
     // 1. Insert transaction.
     // Phase 3 Theme A (AC-10 v1.4): receipt_number generated via
     // next_identifier('receipt') (no longer auto-supplied by trigger).
@@ -82,7 +92,7 @@ export async function POST(request: NextRequest) {
         status: 'completed',
         subtotal: body.subtotal,
         tax_amount: body.tax_amount,
-        tip_amount: 0,
+        tip_amount: tipAmount,
         discount_amount: body.discount_amount || 0,
         total_amount: body.total_amount,
         payment_method: 'cash',
@@ -175,8 +185,8 @@ export async function POST(request: NextRequest) {
       transaction_id: transaction.id,
       method: 'cash',
       amount: body.total_amount,
-      tip_amount: 0,
-      tip_net: 0,
+      tip_amount: tipAmount,
+      tip_net: tipAmount,
       cash_tendered: cashTendered,
       change_given: changeGiven,
     });

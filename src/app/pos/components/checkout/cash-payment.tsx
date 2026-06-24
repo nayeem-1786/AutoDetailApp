@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, WifiOff, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
@@ -12,6 +12,7 @@ import { usePosPermission } from '../../context/pos-permission-context';
 import { useOnlineStatus } from '@/lib/hooks/use-online-status';
 import { queueTransaction } from '@/lib/pos/offline-queue';
 import { fromCents, toCents } from '@/lib/utils/refund-math';
+import { TIP_PRESETS } from '@/lib/utils/constants';
 import { PinPad } from '../pin-pad';
 
 // Bill denominations stacked vertically in the left column, row-aligned with
@@ -23,6 +24,16 @@ const DENOMINATIONS = [10, 20, 50, 100] as const;
 // $99,999.99 hard cap — same value as keypad-tab.tsx / register-tab.tsx /
 // payment-link-amount-modal.tsx. Inlined to avoid coupling to those files.
 const CENTS_CAP = 9999999;
+
+// Tip chip styles (Item 4 / 4a-cash). Shared base + active/idle variants so
+// the preset/custom/no-tip chips read as one selectable group. POS dark-mode
+// rule (#10): every chip + the custom input carries a dark variant.
+const TIP_CHIP_BASE =
+  'flex h-11 min-w-[60px] items-center justify-center rounded-lg border px-4 text-sm font-semibold transition-colors touch-manipulation';
+const TIP_CHIP_ACTIVE =
+  'border-blue-500 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
+const TIP_CHIP_IDLE =
+  'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600';
 
 export function CashPayment() {
   const { ticket, dispatch } = useTicket();
@@ -37,6 +48,60 @@ export function CashPayment() {
   // pattern in keypad-tab.tsx and payment-link-amount-modal.tsx.
   const [cents, setCents] = useState(0);
   const [processing, setProcessing] = useState(false);
+
+  // Tip capture (Item 4 / 4a-cash). The canonical tip AMOUNT lives in
+  // checkout-context (`checkout.tipAmount`, written via `checkout.setTip`) —
+  // we do NOT introduce a second tip-amount container. Only the chip-selection
+  // UI state is local. Presets are a % of subtotal, matching the card on-reader
+  // tip basis (card-payment.tsx). The tip is recorded independently of the cash
+  // tendered: per the locked change-math decision, `change_given` is computed on
+  // the service total ONLY (see `changeCents` below), so a tip never enters the
+  // tendered/change reconciliation.
+  //
+  // The chip selection is LAZILY REHYDRATED from the canonical container on
+  // mount. checkout-overlay.tsx conditionally renders <CashPayment/>, so it
+  // unmounts/remounts on every step change while `checkout.tipAmount`/
+  // `tipPercent` persist in the provider. Without rehydration, returning to the
+  // cash step would reset the chips to "No tip" while an already-entered tip was
+  // still charged (a silent over-charge). Seeding from `tipPercent` (preset) or
+  // `tipAmount` (custom) keeps the UI and the single source of truth in
+  // agreement. First entry resolves to "No tip"/$0 (openCheckout reset), so the
+  // zero-friction default is preserved.
+  const [tipSelection, setTipSelection] = useState<number | 'custom' | 'none'>(() =>
+    checkout.tipPercent != null
+      ? checkout.tipPercent
+      : checkout.tipAmount > 0
+        ? 'custom'
+        : 'none'
+  );
+  const [customTip, setCustomTip] = useState(() =>
+    checkout.tipPercent == null && checkout.tipAmount > 0 ? checkout.tipAmount.toFixed(2) : ''
+  );
+  const subtotalCents = toCents(ticket.subtotal);
+
+  function selectNoTip() {
+    setTipSelection('none');
+    setCustomTip('');
+    checkout.setTip(0, null);
+  }
+  function selectPreset(pct: number) {
+    setTipSelection(pct);
+    setCustomTip('');
+    checkout.setTip(fromCents(Math.round((subtotalCents * pct) / 100)), pct);
+  }
+  function parseCustomTip(raw: string): number {
+    const val = parseFloat(raw);
+    return isNaN(val) || val < 0 ? 0 : fromCents(toCents(val));
+  }
+  function selectCustom() {
+    setTipSelection('custom');
+    checkout.setTip(parseCustomTip(customTip), null);
+  }
+  function handleCustomTip(e: ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value.replace(/[^0-9.]/g, '');
+    setCustomTip(v);
+    checkout.setTip(parseCustomTip(v), null);
+  }
 
   const tenderedDollars = fromCents(cents);
   const displayValue = tenderedDollars.toFixed(2);
@@ -85,7 +150,7 @@ export function CashPayment() {
             vehicle_id: ticket.vehicle?.id || null,
             subtotal: ticket.subtotal,
             tax_amount: ticket.taxAmount,
-            tip_amount: 0,
+            tip_amount: checkout.tipAmount,
             discount_amount: ticket.discountAmount,
             deposit_credit: ticket.depositCredit,
             total_amount: ticket.total,
@@ -120,7 +185,7 @@ export function CashPayment() {
               {
                 method: 'cash',
                 amount: amountDue,
-                tip_amount: 0,
+                tip_amount: checkout.tipAmount,
                 cash_tendered: tenderedNum,
                 change_given: change,
               },
@@ -160,6 +225,7 @@ export function CashPayment() {
           vehicle_id: ticket.vehicle?.id || null,
           subtotal: ticket.subtotal,
           tax_amount: ticket.taxAmount,
+          tip_amount: checkout.tipAmount,
           discount_amount: ticket.discountAmount,
           total_amount: ticket.total,
           coupon_id: ticket.coupon?.id || null,
@@ -234,6 +300,70 @@ export function CashPayment() {
           <span>Offline — transaction will be queued and synced later</span>
         </div>
       )}
+
+      {/* Tip — optional, zero-friction (Item 4 / 4a-cash). Defaults to "No tip"
+          ($0); a no-tip sale needs no interaction here. The selected tip is
+          recorded on the transaction + payment row but is intentionally NOT
+          added to the cash tendered/change math below (locked change-math
+          decision: change is computed on the service total only). */}
+      <div className="flex w-full max-w-md flex-col items-center gap-2">
+        <p className="text-sm text-gray-500 dark:text-gray-400">Add a tip? (optional)</p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={selectNoTip}
+            aria-pressed={tipSelection === 'none'}
+            className={cn(TIP_CHIP_BASE, tipSelection === 'none' ? TIP_CHIP_ACTIVE : TIP_CHIP_IDLE)}
+          >
+            No tip
+          </button>
+          {TIP_PRESETS.map((pct) => (
+            <button
+              key={pct}
+              type="button"
+              onClick={() => selectPreset(pct)}
+              aria-pressed={tipSelection === pct}
+              className={cn(TIP_CHIP_BASE, tipSelection === pct ? TIP_CHIP_ACTIVE : TIP_CHIP_IDLE)}
+            >
+              {pct}%
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={selectCustom}
+            aria-pressed={tipSelection === 'custom'}
+            className={cn(TIP_CHIP_BASE, tipSelection === 'custom' ? TIP_CHIP_ACTIVE : TIP_CHIP_IDLE)}
+          >
+            Custom
+          </button>
+        </div>
+
+        {tipSelection === 'custom' && (
+          <div className="flex items-center gap-2">
+            <span className="text-lg text-gray-500 dark:text-gray-400">$</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*\.?[0-9]*"
+              autoFocus
+              value={customTip}
+              onChange={handleCustomTip}
+              placeholder="0.00"
+              aria-label="Custom tip amount"
+              className="h-11 w-28 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-center text-base text-gray-900 dark:text-gray-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+            />
+          </div>
+        )}
+
+        {checkout.tipAmount > 0 && (
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Tip:{' '}
+            <span className="font-semibold text-gray-900 dark:text-gray-100">
+              ${checkout.tipAmount.toFixed(2)}
+            </span>
+          </p>
+        )}
+      </div>
 
       {/* Body block — naturally sized to two-column width so the footer
           below can use justify-between to spread Back/Complete to the
