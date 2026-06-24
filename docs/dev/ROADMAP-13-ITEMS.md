@@ -35,7 +35,7 @@ One-screen status summary across the 13-item feature scope plus the out-of-scope
 | 1 | POS Customer Search → Create Smart Prefill | ✅ done | Shipped 2026-05-15 (`6b0413dd`). |
 | 2 | Tip on Full-Payment Stripe Payment Link | ✅ done | Shipped 2026-06-20 (Session #159, Path Y). Tip selector on the customer pay page (`/pay/[token]`) gated to full-payment links only; tip captured into `pi.metadata.tip_cents`; webhook writes `transactions.tip_amount` + `payments.tip_amount` + `payments.tip_net`. **Architecture deviation from spec:** roadmap acceptance criteria assumed Stripe-hosted Payment Links + Dashboard `tip_settings`; codebase uses PaymentIntents + Stripe Elements on a custom in-app page — operator-locked Path Y (in-app tip selector reading from canonical `TIP_PRESETS` constant). Tactical-ship debt: under future Option A Phase 3 (single-transaction lifecycle), this tip will migrate to the unified transaction row. |
 | 3 | Receipt Tip Display Audit + Fixes | ✅ done | Shipped 2026-06-19 (Session #155). Audit + Surface D fix bundled. 5-surface matrix in `docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md`; only Surface D (POS admin Transactions detail Total row) carried a bug — S0 reconciliation discrepancy. Orphan `account/transaction-detail.tsx` deleted (latent same-bug-class). |
-| 4 | Cash Tip Capture + Tip Splitting + Tip Reporting | ⚪ not started | Tip cluster. |
+| 4 | Cash Tip Capture + Tip Splitting + Tip Reporting | 🟡 in progress (S1 of 8 shipped) | Tip cluster. S1 (4a-cash — in-checkout cash tip capture) shipped Session #165 (2026-06-24). |
 | 6 | Deposit / Paid-in-Full Label Unification | ✅ done | Shipped 2026-05-15. |
 | 7 | Job Timer with Pause + Reason Modal | ⚪ not started | — |
 | 8 | Assign Customer to Walk-In Ticket Post-Completion | ⚪ not started | — |
@@ -56,9 +56,9 @@ One-screen status summary across the 13-item feature scope plus the out-of-scope
 ### Roll-up
 
 - **Done (11):** 1, 2, 3, 6, 12, 15a, 15b, 15c, 15e, 15f, 15g — plus prior closure of Item 5 (NFC already enabled per Stripe support). *(Item 2 flipped from "not started" to ✅ done on 2026-06-20 in Session #159, Path Y — tip selector on customer pay page; tactical-ship per architecture audit deviation. Item 3 was flipped 2026-06-19 in Session #155.)*
-- **In progress (0):** *(15e closed 2026-05-27; 15f's Layer 8f was the last in-flight implementation sub-layer, closed 2026-05-17.)*
+- **In progress (1):** 4 — S1 of 8 shipped (4a-cash, in-checkout cash tip capture; Session #165, 2026-06-24). *(15e closed 2026-05-27; 15f's Layer 8f was the last in-flight implementation sub-layer, closed 2026-05-17.)*
 - **Absorbed (1):** 15d (absorbed into 15e on 2026-05-27 — unified day-of operations view + appointment-detail modal + multi-type ticket support are now ONE workstream under 15e).
-- **Not started (8):** 4, 7, 8, 9, 10, 11, 13, 14. *(Item 2 left this list 2026-06-20; Wave 2 tip cluster is now 2/3 done — only Item 4 cash-tip remains.)*
+- **Not started (7):** 7, 8, 9, 10, 11, 13, 14. *(Item 2 left this list 2026-06-20; Item 4 entered "in progress" 2026-06-24 when S1/4a-cash shipped — the Wave 2 tip cluster's capture half is now underway.)*
 - **Blocked (0):** nothing currently blocked.
 
 ---
@@ -88,7 +88,7 @@ One-screen status summary across the 13-item feature scope plus the out-of-scope
 | 1 | POS Customer Search → Create Smart Prefill | ✅ done | Ledger #1 (`6b0413dd`), 2026-05-15 | ✅ DONE |
 | 2 | Tip on Full-Payment Stripe Payment Link | ✅ done | Session #159 (2026-06-20) Path Y ship — tip selector on customer pay page; `pi.metadata.tip_cents` contract → webhook writes tip to `transactions.tip_amount` + `payments.tip_amount` + `payments.tip_net` | ✅ DONE |
 | 3 | Receipt Tip Display Audit + Fixes | ✅ done | Session #155 (2026-06-19) audit + Surface D fix; audit doc `docs/dev/RECEIPT_TIP_AUDIT_2026-06-19.md` | ✅ DONE |
-| 4 | Cash Tip Capture + Splitting + Reporting | ⚪ not started | No ledger entry covers Item 4 | ✅ NOT STARTED |
+| 4 | Cash Tip Capture + Splitting + Reporting | 🟡 in progress (S1 of 8) | Session #165 (2026-06-24) — 4a-cash in-checkout cash tip capture shipped; audit `docs/dev/WAVE_2_ITEM_4_CASH_TIP_SPLITTING_REPORTING_AUDIT_2026-06-23.md` | 🟡 IN PROGRESS |
 | 5 | Apple Pay / Google Pay on Stripe Reader | ✅ closed (2026-05-15) | Closed-items table — NFC works by default on WisePOS E | ✅ CLOSED |
 | 6 | Deposit / Paid-in-Full Label Unification | ✅ done | Ledger #6, 2026-05-15 | ✅ DONE |
 | 7 | Job Timer with Pause + Reason Modal | ⚪ not started | No ledger entry covers Item 7 | ✅ NOT STARTED |
@@ -2780,7 +2780,7 @@ email PDF, email HTML, SMS HTML link, browser-printed copy.
 
 ### Item 4 — Cash Tip Capture + Tip Splitting + Tip Reporting
 
-- **Status:** not started
+- **Status:** 🟡 in progress (S1 of 8 shipped — 4a-cash, in-checkout cash tip capture; Session #165, 2026-06-24)
 - **Severity:** S0 (revenue-tracking, payroll-affecting)
 - **Effort:** 3-4 sessions (most complex item in the wave)
 - **Wave:** 2 (Sessions B, C, E, F)
@@ -2873,6 +2873,29 @@ Three related needs:
   on completed transaction view).
 - 2026-05-15: cash payment screen is NOT shown to customer — purely cashier
   side for register balancing.
+- 2026-06-23 (Session A, `51809259`): Item 4 audit landed —
+  `docs/dev/WAVE_2_ITEM_4_CASH_TIP_SPLITTING_REPORTING_AUDIT_2026-06-23.md`.
+  Revised the slice ordering to S1 4a-cash → S2 4a-post → S3 4c-global →
+  S4 4b config → S5 4b engine → S6 4c-employee (dependency-respecting,
+  incrementally shippable). MONEY.md closure reconciled (Session A.5).
+
+**Session-by-session ledger:**
+- **S1 / 4a-cash — Session #165 (2026-06-24): SHIPPED.** In-checkout cash tip
+  capture. Removed the hardcoded `tip_amount: 0` at both grains in
+  `cash-payment.tsx` + the offline-replay route; tip read from
+  `checkout.tipAmount` (single source of truth). Inline tip chips (No tip /
+  15/20/25% / Custom) on the cash screen, $0 zero-friction default, change
+  math unchanged (service-total only). Offline path extended end-to-end
+  (queue payload + `sync-offline-transaction` replay) — closes Appendix A
+  bug #2. Zero schema change. Adversarial-review fixes: chip rehydration
+  across step remount (no silent over-charge) + route-level replay test.
+  ~127 prod LoC; 10 tests; tsc/lint/build clean.
+- S2 / 4a-post — post-completion "Add Cash Tip" (PATCH + loyalty recalc +
+  audit; `tip_payment_method` migration). NOT STARTED.
+- S3 / 4c-global — Tips report (global + per-method, clone Payments Report). NOT STARTED.
+- S4 / 4b — role `tip_pct` + Role Management numeric control. NOT STARTED.
+- S5 / 4b — split engine + attribution (compute-on-read). NOT STARTED.
+- S6 / 4c-employee — per-employee rows + own/employee scoping. NOT STARTED.
 
 ---
 
